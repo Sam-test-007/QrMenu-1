@@ -37,9 +37,9 @@ export class MemStorage implements IStorage {
   async createProfile(insertProfile: InsertProfile): Promise<Profile> {
     const id = randomUUID();
     const profile: Profile = { 
-      ...insertProfile, 
       id,
-      createdAt: new Date().toISOString()
+      fullName: insertProfile.fullName ?? null,
+      createdAt: new Date()
     };
     this.profiles.set(id, profile);
     return profile;
@@ -58,9 +58,11 @@ export class MemStorage implements IStorage {
   async createRestaurant(insertRestaurant: InsertRestaurant): Promise<Restaurant> {
     const id = randomUUID();
     const restaurant: Restaurant = { 
-      ...insertRestaurant, 
       id,
-      createdAt: new Date().toISOString()
+      ownerId: insertRestaurant.ownerId ?? null,
+      name: insertRestaurant.name,
+      slug: insertRestaurant.slug,
+      createdAt: new Date()
     };
     this.restaurants.set(id, restaurant);
     return restaurant;
@@ -73,9 +75,13 @@ export class MemStorage implements IStorage {
   async createMenuItem(insertMenuItem: InsertMenuItem): Promise<MenuItem> {
     const id = randomUUID();
     const menuItem: MenuItem = { 
-      ...insertMenuItem, 
       id,
-      createdAt: new Date().toISOString()
+      restaurantId: insertMenuItem.restaurantId ?? null,
+      name: insertMenuItem.name,
+      description: insertMenuItem.description ?? null,
+      price: insertMenuItem.price,
+      available: insertMenuItem.available ?? null,
+      createdAt: new Date()
     };
     this.menuItems.set(id, menuItem);
     return menuItem;

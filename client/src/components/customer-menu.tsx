@@ -7,7 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Minus, ShoppingCart, Leaf, Flame } from "lucide-react";
 import type { Restaurant, MenuItem } from "@shared/schema";
 
-interface MenuItemWithQuantity extends MenuItem {
+interface MenuItemWithQuantity {
+  id: string;
+  name: string;
+  price: string;
+  available: boolean | null;
+  description: string | null;
   quantity: number;
 }
 
