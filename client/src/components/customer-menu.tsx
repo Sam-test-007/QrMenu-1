@@ -54,7 +54,7 @@ export default function CustomerMenu() {
 
         setMenu({
           name: restaurant.name,
-          items: (items || []).map(item => ({ ...item, quantity: 1 }))
+          items: (items || []).map(item => ({ ...item, quantity: 0 }))
         });
       }
     } catch (error) {
@@ -68,13 +68,18 @@ export default function CustomerMenu() {
   const updateQuantity = (index: number, newQuantity: number) => {
     setMenu(prev => {
       const items = [...prev.items];
-      items[index] = { ...items[index], quantity: Math.max(1, newQuantity) };
+      items[index] = { ...items[index], quantity: Math.max(0, newQuantity) };
       return { ...prev, items };
     });
   };
 
   const total = useMemo(() => 
-    menu.items.reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0),
+    menu.items.filter(item => item.quantity > 0).reduce((sum, item) => sum + (Number(item.price) * item.quantity), 0),
+    [menu.items]
+  );
+
+  const itemsInOrder = useMemo(() => 
+    menu.items.filter(item => item.quantity > 0),
     [menu.items]
   );
 
@@ -178,14 +183,14 @@ export default function CustomerMenu() {
         </Card>
 
         {/* Order Summary */}
-        {menu.items.length > 0 && (
+        {itemsInOrder.length > 0 && (
           <Card className="rounded-2xl shadow-lg sticky bottom-4">
             <CardHeader>
               <CardTitle>Your Order</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3 mb-4">
-                {menu.items.map((item) => (
+                {itemsInOrder.map((item) => (
                   <div key={item.id} className="flex items-center justify-between" data-testid={`order-item-${item.id}`}>
                     <div className="flex items-center space-x-3">
                       <Badge variant="outline" className="rounded-full w-6 h-6 flex items-center justify-center text-xs">
