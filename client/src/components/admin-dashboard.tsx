@@ -22,6 +22,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
   const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const { toast } = useToast();
 
@@ -115,6 +116,37 @@ export default function AdminDashboard() {
         description: error.message,
         variant: "destructive",
       });
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    if (!selectedRestaurant) return null;
+
+    try {
+      setUploadingImage(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${selectedRestaurant.id}/${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('menu-images')
+        .upload(fileName, file);
+
+      if (error) throw error;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('menu-images')
+        .getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to upload image: ${error.message}`,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -392,13 +424,34 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div className="mt-4">
-                          <Label>Image URL (Optional)</Label>
+                          <Label>Image (Optional)</Label>
                           <Input
-                            placeholder="https://example.com/image.jpg"
-                            value={newItem.imageUrl}
-                            onChange={(e) => setNewItem(prev => ({ ...prev, imageUrl: e.target.value }))}
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const imageUrl = await uploadImage(file);
+                                if (imageUrl) {
+                                  setNewItem(prev => ({ ...prev, imageUrl }));
+                                }
+                              }
+                            }}
                             data-testid="input-item-image"
+                            disabled={uploadingImage}
                           />
+                          {uploadingImage && (
+                            <p className="text-sm text-gray-500 mt-1">Uploading image...</p>
+                          )}
+                          {newItem.imageUrl && (
+                            <div className="mt-2">
+                              <img 
+                                src={newItem.imageUrl} 
+                                alt="Preview"
+                                className="w-16 h-16 rounded-lg object-cover"
+                              />
+                            </div>
+                          )}
                         </div>
                         <div className="flex justify-end space-x-3 mt-4">
                           <Button 
@@ -412,8 +465,9 @@ export default function AdminDashboard() {
                             onClick={addMenuItem}
                             className="bg-emerald-600 hover:bg-emerald-700"
                             data-testid="button-save-item"
+                            disabled={uploadingImage}
                           >
-                            Add Item
+                            {uploadingImage ? "Uploading..." : "Add Item"}
                           </Button>
                         </div>
                       </div>
