@@ -13,6 +13,7 @@ interface MenuItemWithQuantity {
   price: string;
   available: boolean | null;
   description: string | null;
+  imageUrl: string | null;
   quantity: number;
 }
 
@@ -45,7 +46,7 @@ export default function CustomerMenu() {
       if (restaurant) {
         const { data: items, error: itemsError } = await supabase
           .from("menu_items")
-          .select("id,name,price,available,description")
+          .select("id,name,price,available,description,image_url")
           .eq("restaurant_id", restaurant.id)
           .eq("available", true)
           .order("created_at", { ascending: true });
@@ -54,7 +55,7 @@ export default function CustomerMenu() {
 
         setMenu({
           name: restaurant.name,
-          items: (items || []).map(item => ({ ...item, quantity: 0 }))
+          items: (items || []).map(item => ({ ...item, imageUrl: item.image_url, quantity: 0 }))
         });
       }
     } catch (error) {
@@ -129,7 +130,14 @@ export default function CustomerMenu() {
                     className="p-6 hover:bg-gray-50 transition-colors"
                     data-testid={`item-${item.id}`}
                   >
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-4">
+                      {item.imageUrl && (
+                        <img 
+                          src={item.imageUrl} 
+                          alt={item.name}
+                          className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                        />
+                      )}
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
                           <h3 className="text-lg font-semibold text-gray-900" data-testid={`text-item-name-${item.id}`}>

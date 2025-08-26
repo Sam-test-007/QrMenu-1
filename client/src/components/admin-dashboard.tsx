@@ -21,7 +21,7 @@ export default function AdminDashboard() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
-  const [newItem, setNewItem] = useState({ name: "", price: "", description: "" });
+  const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
   const [showAddForm, setShowAddForm] = useState(false);
   const { toast } = useToast();
 
@@ -135,14 +135,15 @@ export default function AdminDashboard() {
           restaurant_id: selectedRestaurant.id,
           name: newItem.name,
           price: newItem.price,
-          description: newItem.description || null
+          description: newItem.description || null,
+          image_url: newItem.imageUrl || null
         }])
         .select()
         .single();
 
       if (error) throw error;
       setMenuItems(prev => [...prev, data]);
-      setNewItem({ name: "", price: "", description: "" });
+      setNewItem({ name: "", price: "", description: "", imageUrl: "" });
       setShowAddForm(false);
       toast({
         title: "Success",
@@ -390,6 +391,15 @@ export default function AdminDashboard() {
                             data-testid="input-item-description"
                           />
                         </div>
+                        <div className="mt-4">
+                          <Label>Image URL (Optional)</Label>
+                          <Input
+                            placeholder="https://example.com/image.jpg"
+                            value={newItem.imageUrl}
+                            onChange={(e) => setNewItem(prev => ({ ...prev, imageUrl: e.target.value }))}
+                            data-testid="input-item-image"
+                          />
+                        </div>
                         <div className="flex justify-end space-x-3 mt-4">
                           <Button 
                             variant="outline" 
@@ -415,12 +425,21 @@ export default function AdminDashboard() {
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-3">
-                                <h4 className="text-base font-medium text-gray-900" data-testid={`text-item-name-${item.id}`}>
-                                  {item.name}
-                                </h4>
-                                <Badge variant={item.available ? "default" : "secondary"}>
-                                  {item.available ? "Available" : "Unavailable"}
-                                </Badge>
+                                {item.imageUrl && (
+                                  <img 
+                                    src={item.imageUrl} 
+                                    alt={item.name}
+                                    className="w-12 h-12 rounded-lg object-cover"
+                                  />
+                                )}
+                                <div>
+                                  <h4 className="text-base font-medium text-gray-900" data-testid={`text-item-name-${item.id}`}>
+                                    {item.name}
+                                  </h4>
+                                  <Badge variant={item.available ? "default" : "secondary"}>
+                                    {item.available ? "Available" : "Unavailable"}
+                                  </Badge>
+                                </div>
                               </div>
                               {item.description && (
                                 <p className="text-sm text-gray-500 mt-1" data-testid={`text-item-description-${item.id}`}>

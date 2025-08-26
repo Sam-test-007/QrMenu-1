@@ -80,6 +80,7 @@ export class MemStorage implements IStorage {
       name: insertMenuItem.name,
       description: insertMenuItem.description ?? null,
       price: insertMenuItem.price,
+      imageUrl: insertMenuItem.imageUrl ?? null,
       available: insertMenuItem.available ?? null,
       createdAt: new Date()
     };
