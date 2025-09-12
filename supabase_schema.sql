@@ -2,7 +2,7 @@
 -- This file sets up the complete database schema with proper security policies
 
 -- Enable necessary extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- Create profiles table (matches auth.users)
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -67,7 +67,7 @@ CREATE POLICY "Owners can create restaurants" ON public.restaurants
 
 -- Restaurant owners can update their own restaurants
 CREATE POLICY "Owners can update own restaurants" ON public.restaurants
-    FOR UPDATE USING (auth.uid() = owner_id);
+    FOR UPDATE USING (auth.uid() = owner_id) WITH CHECK (auth.uid() = owner_id);
 
 -- Restaurant owners can delete their own restaurants
 CREATE POLICY "Owners can delete own restaurants" ON public.restaurants
@@ -76,6 +76,10 @@ CREATE POLICY "Owners can delete own restaurants" ON public.restaurants
 -- Allow public to view restaurants (for menu access via slug)
 CREATE POLICY "Public can view restaurants" ON public.restaurants
     FOR SELECT TO anon USING (true);
+
+-- Allow authenticated users to view restaurants for public menu access
+CREATE POLICY "Authenticated can view restaurants" ON public.restaurants
+    FOR SELECT TO authenticated USING (true);
 
 -- RLS Policies for menu_items table
 -- Restaurant owners can manage menu items for their restaurants
@@ -98,6 +102,10 @@ CREATE POLICY "Owners can update own menu items" ON public.menu_items
         auth.uid() IN (
             SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
         )
+    ) WITH CHECK (
+        auth.uid() IN (
+            SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
+        )
     );
 
 CREATE POLICY "Owners can delete own menu items" ON public.menu_items
@@ -110,6 +118,10 @@ CREATE POLICY "Owners can delete own menu items" ON public.menu_items
 -- Allow public to view available menu items (for menu display)
 CREATE POLICY "Public can view available menu items" ON public.menu_items
     FOR SELECT TO anon USING (available = true);
+
+-- Allow authenticated users to view available menu items for public menu access
+CREATE POLICY "Authenticated can view available menu items" ON public.menu_items
+    FOR SELECT TO authenticated USING (available = true);
 
 -- Function to automatically create a profile when a user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -229,6 +241,7 @@ RETURNS TABLE (
     created_at TIMESTAMP WITH TIME ZONE
 ) 
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
     RETURN QUERY
@@ -253,6 +266,7 @@ RETURNS TABLE (
     available BOOLEAN
 ) 
 SECURITY DEFINER
+SET search_path = public
 AS $$
 BEGIN
     RETURN QUERY
