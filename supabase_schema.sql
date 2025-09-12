@@ -32,16 +32,30 @@ CREATE TABLE IF NOT EXISTS public.menu_items (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Create tables table
+CREATE TABLE IF NOT EXISTS public.tables (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID REFERENCES public.restaurants(id) ON DELETE CASCADE,
+    table_number INTEGER NOT NULL,
+    name TEXT,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE (restaurant_id, table_number)
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_restaurants_owner_id ON public.restaurants(owner_id);
 CREATE INDEX IF NOT EXISTS idx_restaurants_slug ON public.restaurants(slug);
 CREATE INDEX IF NOT EXISTS idx_menu_items_restaurant_id ON public.menu_items(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_menu_items_available ON public.menu_items(available);
+CREATE INDEX IF NOT EXISTS idx_tables_restaurant_id ON public.tables(restaurant_id);
+CREATE INDEX IF NOT EXISTS idx_tables_active ON public.tables(active);
 
 -- Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.tables ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles table
 -- Users can view their own profile
@@ -123,6 +137,42 @@ CREATE POLICY "Public can view available menu items" ON public.menu_items
 CREATE POLICY "Authenticated can view available menu items" ON public.menu_items
     FOR SELECT TO authenticated USING (available = true);
 
+-- RLS Policies for tables table
+-- Restaurant owners can manage tables for their restaurants
+CREATE POLICY "Owners can view own tables" ON public.tables
+    FOR SELECT USING (
+        auth.uid() IN (
+            SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
+        )
+    );
+
+CREATE POLICY "Owners can create tables" ON public.tables
+    FOR INSERT WITH CHECK (
+        auth.uid() IN (
+            SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
+        )
+    );
+
+CREATE POLICY "Owners can update own tables" ON public.tables
+    FOR UPDATE USING (
+        auth.uid() IN (
+            SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
+        )
+    ) WITH CHECK (
+        auth.uid() IN (
+            SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
+        )
+    );
+
+CREATE POLICY "Owners can delete own tables" ON public.tables
+    FOR DELETE USING (
+        auth.uid() IN (
+            SELECT owner_id FROM public.restaurants WHERE id = restaurant_id
+        )
+    );
+
+-- Note: No public access to tables is allowed for security
+
 -- Function to automatically create a profile when a user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
@@ -189,6 +239,28 @@ DROP TRIGGER IF EXISTS validate_price ON public.menu_items;
 CREATE TRIGGER validate_price
     BEFORE INSERT OR UPDATE ON public.menu_items
     FOR EACH ROW EXECUTE PROCEDURE public.validate_menu_item_price();
+
+-- Function to validate table number
+CREATE OR REPLACE FUNCTION public.validate_table_number()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.table_number <= 0 THEN
+        RAISE EXCEPTION 'Table number must be a positive integer';
+    END IF;
+    
+    IF NEW.table_number > 9999 THEN
+        RAISE EXCEPTION 'Table number cannot exceed 9999';
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to validate table number
+DROP TRIGGER IF EXISTS validate_table_number ON public.tables;
+CREATE TRIGGER validate_table_number
+    BEFORE INSERT OR UPDATE ON public.tables
+    FOR EACH ROW EXECUTE PROCEDURE public.validate_table_number();
 
 -- Grant necessary permissions to authenticated users
 GRANT USAGE ON SCHEMA public TO authenticated;
@@ -303,10 +375,14 @@ ON CONFLICT DO NOTHING;
 COMMENT ON TABLE public.profiles IS 'User profiles linked to Supabase auth.users';
 COMMENT ON TABLE public.restaurants IS 'Restaurant information with unique slugs for QR menu access';
 COMMENT ON TABLE public.menu_items IS 'Individual menu items for each restaurant';
+COMMENT ON TABLE public.tables IS 'Restaurant table management for QR code assignments';
 
 COMMENT ON COLUMN public.restaurants.slug IS 'URL-friendly unique identifier for restaurant menus';
 COMMENT ON COLUMN public.menu_items.available IS 'Whether the menu item is currently available for ordering';
 COMMENT ON COLUMN public.menu_items.price IS 'Price in the restaurant''s local currency';
+COMMENT ON COLUMN public.tables.table_number IS 'Unique numeric identifier for tables within a restaurant';
+COMMENT ON COLUMN public.tables.name IS 'Optional descriptive name for the table (e.g., Window Table, VIP Table)';
+COMMENT ON COLUMN public.tables.active IS 'Whether the table is currently active for QR code access';
 
 -- Security note: All RLS policies ensure users can only access their own data
 -- Public access is granted only for viewing restaurants and available menu items

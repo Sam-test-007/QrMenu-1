@@ -26,6 +26,10 @@ export default function CustomerMenu() {
   const { slug } = useParams();
   const [menu, setMenu] = useState<MenuData>({ name: "", items: [] });
   const [loading, setLoading] = useState(true);
+  
+  // Extract table number from URL query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const tableNumber = urlParams.get('table');
 
   useEffect(() => {
     if (slug) {
@@ -108,6 +112,13 @@ export default function CustomerMenu() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid="text-restaurant-name">
             {menu.name}
           </h1>
+          {tableNumber && (
+            <div className="mb-2">
+              <Badge variant="outline" className="text-lg px-4 py-1 bg-emerald-50 border-emerald-200 text-emerald-700" data-testid="text-table-number">
+                🪑 Table {tableNumber}
+              </Badge>
+            </div>
+          )}
           <p className="text-gray-600">Authentic cuisine made with love</p>
         </div>
 

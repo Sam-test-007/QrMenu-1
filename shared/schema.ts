@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, uuid, numeric, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, uuid, numeric, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -31,7 +31,7 @@ export const menuItems = pgTable("menu_items", {
 export const tables = pgTable("tables", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   restaurantId: uuid("restaurant_id").references(() => restaurants.id, { onDelete: "cascade" }),
-  tableNumber: text("table_number").notNull(),
+  tableNumber: integer("table_number").notNull(),
   name: text("name"), // Optional name like "Window Table" or "VIP Table"
   active: boolean("active").default(true),
   createdAt: timestamp("created_at").default(sql`now()`),
