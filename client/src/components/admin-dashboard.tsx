@@ -7,12 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, User, LogOut, Plus, Utensils, Calendar, ExternalLink, Edit, Trash2 } from "lucide-react";
+import { QrCode, User, LogOut, Plus, Utensils, Calendar, ExternalLink, Trash2 } from "lucide-react";
 import QRCodeGenerator from "./qr-code-generator";
-import type { Restaurant, MenuItem, Table } from "@shared/schema";
+import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
 
 export default function AdminDashboard() {
@@ -20,15 +18,11 @@ export default function AdminDashboard() {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [tables, setTables] = useState<Table[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
   const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
-  const [newTable, setNewTable] = useState({ tableNumber: "", name: "" });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showAddTableForm, setShowAddTableForm] = useState(false);
-  const [activeTab, setActiveTab] = useState<"menu" | "tables">("menu");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -40,10 +34,8 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (selectedRestaurant) {
       loadMenuItems();
-      loadTables();
     } else {
       setMenuItems([]);
-      setTables([]);
     }
   }, [selectedRestaurant]);
 
@@ -80,27 +72,6 @@ export default function AdminDashboard() {
 
       if (error) throw error;
       setMenuItems(data || []);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const loadTables = async () => {
-    if (!selectedRestaurant) return;
-
-    try {
-      const { data, error } = await supabase
-        .from("tables")
-        .select("*")
-        .eq("restaurant_id", selectedRestaurant.id)
-        .order("table_number", { ascending: true });
-
-      if (error) throw error;
-      setTables(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -253,68 +224,6 @@ export default function AdminDashboard() {
       toast({
         title: "Success",
         description: "Menu item deleted successfully!",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const addTable = async () => {
-    if (!selectedRestaurant || !newTable.tableNumber) {
-      toast({
-        title: "Error",
-        description: "Table number is required",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from("tables")
-        .insert([{
-          restaurant_id: selectedRestaurant.id,
-          table_number: newTable.tableNumber,
-          name: newTable.name || null
-        }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      setTables(prev => [...prev, data]);
-      setNewTable({ tableNumber: "", name: "" });
-      setShowAddTableForm(false);
-      toast({
-        title: "Success",
-        description: "Table added successfully!",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const deleteTable = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this table?")) return;
-
-    try {
-      const { error } = await supabase
-        .from("tables")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      setTables(prev => prev.filter(table => table.id !== id));
-      toast({
-        title: "Success",
-        description: "Table deleted successfully!",
       });
     } catch (error: any) {
       toast({
@@ -480,7 +389,6 @@ export default function AdminDashboard() {
                         </p>
                         <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
                           <span><Utensils className="inline mr-1 h-4 w-4" />{menuItems.length} menu items</span>
-                          <span>🪑 {tables.length} tables</span>
                         </div>
                       </div>
                       
@@ -497,317 +405,183 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
 
-                {/* Tabs for Menu and Table Management */}
+                {/* Menu Management */}
                 <Card>
-                  <CardContent className="p-0">
-                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "menu" | "tables")}>
-                      <TabsList className="grid w-full grid-cols-2">
-                        <TabsTrigger value="menu" data-testid="tab-menu">Menu Items</TabsTrigger>
-                        <TabsTrigger value="tables" data-testid="tab-tables">Tables</TabsTrigger>
-                      </TabsList>
+                  <CardContent className="p-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+                      <h3 className="text-lg font-semibold">Menu Items</h3>
+                      <Button 
+                        onClick={() => setShowAddForm(!showAddForm)}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                        data-testid="button-toggle-add-form"
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Add Item
+                      </Button>
+                    </div>
 
-                      {/* Menu Management Tab */}
-                      <TabsContent value="menu" className="mt-0">
-                        <div className="p-6">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                            <h3 className="text-lg font-semibold">Menu Items</h3>
-                            <Button 
-                              onClick={() => setShowAddForm(!showAddForm)}
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                              data-testid="button-toggle-add-form"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Add Item
-                            </Button>
+                    {/* Add Item Form */}
+                    {showAddForm && (
+                      <div className="mb-6 p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label>Item Name</Label>
+                            <Input
+                              placeholder="e.g., Margherita Pizza"
+                              value={newItem.name}
+                              onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
+                              data-testid="input-item-name"
+                            />
                           </div>
+                          <div>
+                            <Label>Price ($)</Label>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              placeholder="0.00"
+                              value={newItem.price}
+                              onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
+                              data-testid="input-item-price"
+                            />
+                          </div>
+                        </div>
+                        <div className="mt-4">
+                          <Label>Description (Optional)</Label>
+                          <Input
+                            placeholder="Brief description of the item..."
+                            value={newItem.description}
+                            onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
+                            data-testid="input-item-description"
+                          />
+                        </div>
+                        <div className="mt-4">
+                          <Label>Image (Optional)</Label>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const imageUrl = await uploadImage(file);
+                                if (imageUrl) {
+                                  setNewItem(prev => ({ ...prev, imageUrl }));
+                                }
+                              }
+                            }}
+                            data-testid="input-item-image"
+                            disabled={uploadingImage}
+                          />
+                          <p className="text-xs text-gray-500 mt-1">
+                            Accepted formats: JPG, PNG, WebP, GIF. Max size: 200KB
+                          </p>
+                          {uploadingImage && (
+                            <p className="text-sm text-gray-500 mt-1">Uploading image...</p>
+                          )}
+                          {newItem.imageUrl && (
+                            <div className="mt-2">
+                              <img 
+                                src={newItem.imageUrl} 
+                                alt="Preview"
+                                className="w-16 h-16 rounded-lg object-cover"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end space-x-3 mt-4">
+                          <Button 
+                            variant="outline" 
+                            onClick={() => setShowAddForm(false)}
+                            data-testid="button-cancel-add"
+                          >
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={addMenuItem}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            data-testid="button-save-item"
+                            disabled={uploadingImage}
+                          >
+                            {uploadingImage ? "Uploading..." : "Add Item"}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
-                          {/* Add Item Form */}
-                          {showAddForm && (
-                            <div className="mb-6 p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                  <Label>Item Name</Label>
-                                  <Input
-                                    placeholder="e.g., Margherita Pizza"
-                                    value={newItem.name}
-                                    onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
-                                    data-testid="input-item-name"
+                    {/* Menu Items List */}
+                    <div className="space-y-4">
+                      {menuItems.map((item) => (
+                        <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-testid={`row-menu-item-${item.id}`}>
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center space-x-3">
+                                {item.imageUrl && (
+                                  <img 
+                                    src={item.imageUrl} 
+                                    alt={item.name}
+                                    className="w-12 h-12 rounded-lg object-cover"
                                   />
-                                </div>
+                                )}
                                 <div>
-                                  <Label>Price ($)</Label>
-                                  <Input
-                                    type="number"
-                                    step="0.01"
-                                    placeholder="0.00"
-                                    value={newItem.price}
-                                    onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
-                                    data-testid="input-item-price"
-                                  />
+                                  <h4 className="text-base font-medium text-gray-900" data-testid={`text-item-name-${item.id}`}>
+                                    {item.name}
+                                  </h4>
+                                  <Badge variant={item.available ? "default" : "secondary"}>
+                                    {item.available ? "Available" : "Unavailable"}
+                                  </Badge>
                                 </div>
                               </div>
-                              <div className="mt-4">
-                                <Label>Description (Optional)</Label>
-                                <Input
-                                  placeholder="Brief description of the item..."
-                                  value={newItem.description}
-                                  onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
-                                  data-testid="input-item-description"
-                                />
-                              </div>
-                              <div className="mt-4">
-                                <Label>Image (Optional)</Label>
-                                <Input
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={async (e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      const imageUrl = await uploadImage(file);
-                                      if (imageUrl) {
-                                        setNewItem(prev => ({ ...prev, imageUrl }));
-                                      }
-                                    }
-                                  }}
-                                  data-testid="input-item-image"
-                                  disabled={uploadingImage}
-                                />
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Accepted formats: JPG, PNG, WebP, GIF. Max size: 200KB
+                              {item.description && (
+                                <p className="text-sm text-gray-500 mt-1" data-testid={`text-item-description-${item.id}`}>
+                                  {item.description}
                                 </p>
-                                {uploadingImage && (
-                                  <p className="text-sm text-gray-500 mt-1">Uploading image...</p>
-                                )}
-                                {newItem.imageUrl && (
-                                  <div className="mt-2">
-                                    <img 
-                                      src={newItem.imageUrl} 
-                                      alt="Preview"
-                                      className="w-16 h-16 rounded-lg object-cover"
-                                    />
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex justify-end space-x-3 mt-4">
-                                <Button 
-                                  variant="outline" 
-                                  onClick={() => setShowAddForm(false)}
-                                  data-testid="button-cancel-add"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button 
-                                  onClick={addMenuItem}
-                                  className="bg-emerald-600 hover:bg-emerald-700"
-                                  data-testid="button-save-item"
-                                  disabled={uploadingImage}
-                                >
-                                  {uploadingImage ? "Uploading..." : "Add Item"}
-                                </Button>
+                              )}
+                              <div className="flex items-center space-x-4 mt-2">
+                                <span className="text-lg font-semibold text-gray-900" data-testid={`text-item-price-${item.id}`}>
+                                  ${currency(Number(item.price))}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  Added {new Date(item.createdAt || "").toLocaleDateString()}
+                                </span>
                               </div>
                             </div>
-                          )}
-
-                          {/* Menu Items List */}
-                          <div className="space-y-4">
-                            {menuItems.map((item) => (
-                              <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-testid={`row-menu-item-${item.id}`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <div className="flex items-center space-x-3">
-                                      {item.imageUrl && (
-                                        <img 
-                                          src={item.imageUrl} 
-                                          alt={item.name}
-                                          className="w-12 h-12 rounded-lg object-cover"
-                                        />
-                                      )}
-                                      <div>
-                                        <h4 className="text-base font-medium text-gray-900" data-testid={`text-item-name-${item.id}`}>
-                                          {item.name}
-                                        </h4>
-                                        <Badge variant={item.available ? "default" : "secondary"}>
-                                          {item.available ? "Available" : "Unavailable"}
-                                        </Badge>
-                                      </div>
-                                    </div>
-                                    {item.description && (
-                                      <p className="text-sm text-gray-500 mt-1" data-testid={`text-item-description-${item.id}`}>
-                                        {item.description}
-                                      </p>
-                                    )}
-                                    <div className="flex items-center space-x-4 mt-2">
-                                      <span className="text-lg font-semibold text-gray-900" data-testid={`text-item-price-${item.id}`}>
-                                        ${currency(Number(item.price))}
-                                      </span>
-                                      <span className="text-xs text-gray-500">
-                                        Added {new Date(item.createdAt || "").toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-2 ml-4">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm"
-                                      onClick={() => deleteMenuItem(item.id)}
-                                      data-testid={`button-delete-item-${item.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-600" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-
-                            {/* Empty state when no items */}
-                            {menuItems.length === 0 && (
-                              <div className="text-center py-12">
-                                <Utensils className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No menu items yet</h3>
-                                <p className="text-gray-500 mb-6">Get started by adding your first menu item</p>
-                                <Button 
-                                  onClick={() => setShowAddForm(true)}
-                                  className="bg-emerald-600 hover:bg-emerald-700"
-                                  data-testid="button-add-first-item"
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  Add Your First Item
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </TabsContent>
-
-                      {/* Tables Management Tab */}
-                      <TabsContent value="tables" className="mt-0">
-                        <div className="p-6">
-                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                            <h3 className="text-lg font-semibold">Tables</h3>
-                            <Button 
-                              onClick={() => setShowAddTableForm(!showAddTableForm)}
-                              className="bg-emerald-600 hover:bg-emerald-700"
-                              data-testid="button-toggle-add-table-form"
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Add Table
-                            </Button>
-                          </div>
-
-                          {/* Add Table Form */}
-                          {showAddTableForm && (
-                            <div className="mb-6 p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                  <Label>Table Number</Label>
-                                  <Input
-                                    placeholder="e.g., 1, A1, Table 5"
-                                    value={newTable.tableNumber}
-                                    onChange={(e) => setNewTable(prev => ({ ...prev, tableNumber: e.target.value }))}
-                                    data-testid="input-table-number"
-                                  />
-                                </div>
-                                <div>
-                                  <Label>Table Name (Optional)</Label>
-                                  <Input
-                                    placeholder="e.g., Window Table, VIP Section"
-                                    value={newTable.name}
-                                    onChange={(e) => setNewTable(prev => ({ ...prev, name: e.target.value }))}
-                                    data-testid="input-table-name"
-                                  />
-                                </div>
-                              </div>
-                              <div className="flex justify-end space-x-3 mt-4">
-                                <Button 
-                                  variant="outline" 
-                                  onClick={() => setShowAddTableForm(false)}
-                                  data-testid="button-cancel-add-table"
-                                >
-                                  Cancel
-                                </Button>
-                                <Button 
-                                  onClick={addTable}
-                                  className="bg-emerald-600 hover:bg-emerald-700"
-                                  data-testid="button-save-table"
-                                >
-                                  Add Table
-                                </Button>
-                              </div>
+                            <div className="flex items-center space-x-2 ml-4">
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
+                                onClick={() => deleteMenuItem(item.id)}
+                                data-testid={`button-delete-item-${item.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
                             </div>
-                          )}
-
-                          {/* Tables List */}
-                          <div className="space-y-4">
-                            {tables.map((table) => (
-                              <div key={table.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-testid={`row-table-${table.id}`}>
-                                <div className="flex items-center justify-between">
-                                  <div className="flex-1">
-                                    <h4 className="text-base font-medium text-gray-900" data-testid={`text-table-number-${table.id}`}>
-                                      Table {table.tableNumber}
-                                    </h4>
-                                    {table.name && (
-                                      <p className="text-sm text-gray-500 mt-1" data-testid={`text-table-name-${table.id}`}>
-                                        {table.name}
-                                      </p>
-                                    )}
-                                    <div className="flex items-center space-x-4 mt-2">
-                                      <span className="text-xs text-gray-500">
-                                        Created {new Date(table.createdAt || "").toLocaleDateString()}
-                                      </span>
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        asChild 
-                                        data-testid={`button-view-qr-${table.id}`}
-                                      >
-                                        <Link to={`/menu/${selectedRestaurant?.slug}?table=${table.tableNumber}`}>
-                                          <QrCode className="mr-1 h-3 w-3" />
-                                          View QR
-                                        </Link>
-                                      </Button>
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center space-x-2 ml-4">
-                                    <Button 
-                                      variant="ghost" 
-                                      size="sm"
-                                      onClick={() => deleteTable(table.id)}
-                                      data-testid={`button-delete-table-${table.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-red-600" />
-                                    </Button>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-
-                            {/* Empty state when no tables */}
-                            {tables.length === 0 && (
-                              <div className="text-center py-12">
-                                <div className="text-4xl mb-4">🪑</div>
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No tables yet</h3>
-                                <p className="text-gray-500 mb-6">Create tables to generate individual QR codes for each one</p>
-                                <Button 
-                                  onClick={() => setShowAddTableForm(true)}
-                                  className="bg-emerald-600 hover:bg-emerald-700"
-                                  data-testid="button-add-first-table"
-                                >
-                                  <Plus className="mr-2 h-4 w-4" />
-                                  Add Your First Table
-                                </Button>
-                              </div>
-                            )}
                           </div>
                         </div>
-                      </TabsContent>
-                    </Tabs>
+                      ))}
+
+                      {/* Empty state when no items */}
+                      {menuItems.length === 0 && (
+                        <div className="text-center py-12">
+                          <Utensils className="mx-auto h-12 w-12 text-gray-300 mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No menu items yet</h3>
+                          <p className="text-gray-500 mb-6">Get started by adding your first menu item</p>
+                          <Button 
+                            onClick={() => setShowAddForm(true)}
+                            className="bg-emerald-600 hover:bg-emerald-700"
+                            data-testid="button-add-first-item"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Your First Item
+                          </Button>
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               </>
             ) : (
               <Card>
                 <CardContent className="p-6 text-center">
-                  <p>Select a restaurant to manage its menu and tables.</p>
+                  <p>Select a restaurant to manage its menu.</p>
                 </CardContent>
               </Card>
             )}
