@@ -150,6 +150,27 @@ export default function AdminDashboard() {
   const uploadImage = async (file: File): Promise<string | null> => {
     if (!selectedRestaurant) return null;
 
+    // Check file size limit (200KB = 204,800 bytes)
+    const maxSize = 200 * 1024; // 200KB in bytes
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: `Image must be smaller than 200KB. Your file is ${Math.round(file.size / 1024)}KB.`,
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    // Check if file is an image
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file (PNG, JPG, JPEG, WebP, etc.)",
+        variant: "destructive",
+      });
+      return null;
+    }
+
     try {
       setUploadingImage(true);
       const fileExt = file.name.split('.').pop();
@@ -551,6 +572,9 @@ export default function AdminDashboard() {
                                   data-testid="input-item-image"
                                   disabled={uploadingImage}
                                 />
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Accepted formats: JPG, PNG, WebP, GIF. Max size: 200KB
+                                </p>
                                 {uploadingImage && (
                                   <p className="text-sm text-gray-500 mt-1">Uploading image...</p>
                                 )}
