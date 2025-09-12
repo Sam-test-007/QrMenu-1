@@ -28,17 +28,35 @@ export default function AuthForm() {
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({ 
+      const { data, error } = await supabase.auth.signUp({ 
         email, 
         password,
       });
       
       if (error) throw error;
       
-      toast({
-        title: "Success",
-        description: "Check your email for the confirmation link!",
-      });
+      // Create profile for the new user if auto-confirmation is enabled
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "Success",
+          description: "Check your email for the confirmation link!",
+        });
+      } else if (data.user) {
+        // If auto-confirmation is enabled, create profile immediately
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert({ 
+            id: data.user.id,
+            full_name: data.user.email || data.user.user_metadata?.full_name || null
+          })
+          .select();
+        
+        if (profileError) {
+          console.warn("Profile creation warning:", profileError);
+        }
+        
+        navigate("/dashboard");
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -73,7 +91,10 @@ export default function AuthForm() {
       if (data.user) {
         const { error: profileError } = await supabase
           .from("profiles")
-          .upsert({ id: data.user.id })
+          .upsert({ 
+            id: data.user.id,
+            full_name: data.user.email || data.user.user_metadata?.full_name || null
+          })
           .select();
         
         if (profileError) {
