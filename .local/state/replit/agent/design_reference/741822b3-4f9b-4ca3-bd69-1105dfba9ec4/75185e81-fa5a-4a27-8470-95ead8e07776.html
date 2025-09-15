@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Menu SaaS - Restaurant Management Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#EEF2FF',
+                            500: '#6366F1',
+                            600: '#4F46E5',
+                            700: '#4338CA',
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-gray-50 font-sans antialiased">
+
+    <!-- @STATE: currentView:string = 'auth' | 'dashboard' | 'menu' -->
+    <!-- @STATE: user:object = null -->
+    <!-- @STATE: restaurants:array = [] -->
+    <!-- @STATE: selectedRestaurant:object = null -->
+    <!-- @STATE: menuItems:array = [] -->
+
+    <!-- Authentication View -->
+    <!-- @COMPONENT: AuthForm [mode: 'signin' | 'signup'] -->
+    <div id="auth-view" class="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary-50 to-white">
+        <div class="max-w-md w-full space-y-8">
+            <div class="text-center">
+                <div class="mx-auto h-16 w-16 bg-primary-600 rounded-xl flex items-center justify-center mb-6">
+                    <i class="fas fa-qrcode text-white text-2xl"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-gray-900 mb-2">QR Menu SaaS</h2>
+                <p class="text-gray-600">Manage your restaurant menus with ease</p>
+            </div>
+
+            <div class="bg-white py-8 px-6 shadow-xl rounded-2xl border border-gray-100">
+                <div class="mb-6">
+                    <div class="flex bg-gray-100 rounded-lg p-1 mb-6" data-mock="true">
+                        <button class="flex-1 py-2 px-4 text-sm font-medium rounded-md bg-white text-primary-600 shadow-sm transition-colors">
+                            Sign In
+                        </button>
+                        <button class="flex-1 py-2 px-4 text-sm font-medium rounded-md text-gray-500 hover:text-gray-700 transition-colors" data-event="click:switchToSignup">
+                            Sign Up
+                        </button>
+                    </div>
+                </div>
+
+                <form class="space-y-4" data-event="submit:handleAuth">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Email address</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-envelope text-gray-400"></i>
+                            </div>
+                            <input type="email" 
+                                   placeholder="Enter your email" 
+                                   class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                                   data-bind="authForm.email" 
+                                   data-mock="true">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input type="password" 
+                                   placeholder="Enter your password" 
+                                   class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors"
+                                   data-bind="authForm.password" 
+                                   data-mock="true">
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" 
+                                class="w-full bg-primary-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
+                                data-event="click:handleSignIn"
+                                data-implementation="Should validate form and authenticate user">
+                            <span data-bind="loading ? 'Signing in...' : 'Sign In'" data-mock="true">Sign In</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-600">
+                        Don't have an account? 
+                        <button class="font-medium text-primary-600 hover:text-primary-500 transition-colors" data-event="click:switchToSignup">
+                            Sign up here
+                        </button>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AuthForm -->
+
+    <!-- Admin Dashboard View -->
+    <!-- @COMPONENT: AdminDashboard [user, restaurants, selectedRestaurant] -->
+    <div id="dashboard-view" class="min-h-screen bg-gray-50" style="display: none;">
+        <!-- Navigation Header -->
+        <nav class="bg-white shadow-sm border-b border-gray-200">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16">
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0 flex items-center">
+                            <div class="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center mr-3">
+                                <i class="fas fa-qrcode text-white"></i>
+                            </div>
+                            <h1 class="text-xl font-bold text-gray-900">QR Menu SaaS</h1>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <div class="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
+                                <i class="fas fa-user text-gray-600 text-sm"></i>
+                            </div>
+                            <span class="text-sm text-gray-700" data-bind="user.email" data-mock="true">user@example.com</span>
+                        </div>
+                        <button class="text-sm text-gray-500 hover:text-gray-700 transition-colors" data-event="click:signOut">
+                            <i class="fas fa-sign-out-alt mr-1"></i>Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                
+                <!-- Restaurant Sidebar -->
+                <!-- @COMPONENT: RestaurantSidebar [restaurants, selectedRestaurant, onSelectRestaurant] -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-lg font-semibold text-gray-900">Your Restaurants</h3>
+                        </div>
+                        
+                        <div class="p-4 space-y-3 max-h-96 overflow-y-auto">
+                            <!-- @MAP: restaurants.map(restaurant => ( -->
+                            <div class="p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors cursor-pointer" data-mock="true">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-gray-900" data-bind="restaurant.name">Bella's Italian Bistro</h4>
+                                        <p class="text-sm text-gray-500 mt-1" data-bind="restaurant.slug">/{slug}</p>
+                                        <div class="flex items-center mt-2 space-x-4 text-xs text-gray-500">
+                                            <span><i class="fas fa-utensils mr-1"></i>12 items</span>
+                                            <span><i class="fas fa-calendar mr-1"></i>Created 2 days ago</span>
+                                        </div>
+                                    </div>
+                                    <button class="text-primary-600 hover:text-primary-700 text-sm font-medium" data-event="click:selectRestaurant">
+                                        Manage
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="p-4 border border-gray-200 rounded-lg hover:border-primary-300 transition-colors cursor-pointer" data-mock="true">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-gray-900">Ocean View Cafe</h4>
+                                        <p class="text-sm text-gray-500 mt-1">/ocean-view-cafe</p>
+                                        <div class="flex items-center mt-2 space-x-4 text-xs text-gray-500">
+                                            <span><i class="fas fa-utensils mr-1"></i>8 items</span>
+                                            <span><i class="fas fa-calendar mr-1"></i>Created 1 week ago</span>
+                                        </div>
+                                    </div>
+                                    <button class="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                                        Manage
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+
+                        <!-- Create New Restaurant Form -->
+                        <div class="px-6 py-4 border-t border-gray-200 bg-gray-50">
+                            <h4 class="text-sm font-semibold text-gray-900 mb-3">Create New Restaurant</h4>
+                            <div class="space-y-3">
+                                <input type="text" 
+                                       placeholder="Restaurant name" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                       data-bind="newRestaurant.name" 
+                                       data-mock="true">
+                                <input type="text" 
+                                       placeholder="URL slug (e.g., my-restaurant)" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                                       data-bind="newRestaurant.slug" 
+                                       data-mock="true">
+                                <button class="w-full bg-emerald-600 text-white py-2 px-4 rounded-lg font-medium hover:bg-emerald-700 transition-colors text-sm" 
+                                        data-event="click:createRestaurant"
+                                        data-implementation="Should validate and create new restaurant">
+                                    <i class="fas fa-plus mr-2"></i>Create Restaurant
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- @END_COMPONENT: RestaurantSidebar -->
+
+                <!-- Main Content Area -->
+                <div class="lg:col-span-2 space-y-6">
+                    
+                    <!-- Restaurant Header -->
+                    <!-- @COMPONENT: RestaurantHeader [selectedRestaurant, onGenerateQR, onViewPublic] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6" data-mock="true">
+                        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                            <div class="mb-4 sm:mb-0">
+                                <h2 class="text-2xl font-bold text-gray-900" data-bind="selectedRestaurant.name">Bella's Italian Bistro</h2>
+                                <p class="text-gray-600 mt-1">
+                                    <i class="fas fa-link mr-1"></i>
+                                    <span data-bind="selectedRestaurant.slug">/bellas-italian-bistro</span>
+                                </p>
+                                <div class="flex items-center space-x-4 mt-3 text-sm text-gray-500">
+                                    <span><i class="fas fa-utensils mr-1"></i>12 menu items</span>
+                                    <span><i class="fas fa-eye mr-1"></i>245 views this week</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col sm:flex-row gap-3">
+                                <a href="#" class="inline-flex items-center px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors" data-event="click:viewPublicMenu">
+                                    <i class="fas fa-external-link-alt mr-2"></i>View Public Menu
+                                </a>
+                                <button class="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors" data-event="click:generateQRCode">
+                                    <i class="fas fa-qrcode mr-2"></i>Generate QR Code
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: RestaurantHeader -->
+
+                    <!-- Menu Management -->
+                    <!-- @COMPONENT: MenuManagement [menuItems, onAddItem, onEditItem, onDeleteItem] -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                                <h3 class="text-lg font-semibold text-gray-900 mb-2 sm:mb-0">Menu Items</h3>
+                                <button class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors" data-event="click:showAddItemForm">
+                                    <i class="fas fa-plus mr-2"></i>Add Item
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Add Item Form (Hidden by default) -->
+                        <!-- @COMPONENT: AddItemForm [onSubmit, onCancel] -->
+                        <div class="px-6 py-4 bg-emerald-50 border-b border-emerald-200" data-mock="true">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Item Name</label>
+                                    <input type="text" 
+                                           placeholder="e.g., Margherita Pizza" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                           data-bind="newItem.name" 
+                                           data-mock="true">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Price ($)</label>
+                                    <input type="number" 
+                                           step="0.01"
+                                           placeholder="0.00" 
+                                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                                           data-bind="newItem.price" 
+                                           data-mock="true">
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Description (Optional)</label>
+                                <textarea placeholder="Brief description of the item..." 
+                                          rows="2"
+                                          class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none"
+                                          data-bind="newItem.description" 
+                                          data-mock="true"></textarea>
+                            </div>
+                            <div class="flex justify-end space-x-3 mt-4">
+                                <button class="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors" data-event="click:cancelAddItem">
+                                    Cancel
+                                </button>
+                                <button class="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors" data-event="click:addMenuItem">
+                                    Add Item
+                                </button>
+                            </div>
+                        </div>
+                        <!-- @END_COMPONENT: AddItemForm -->
+
+                        <div class="divide-y divide-gray-200">
+                            <!-- @MAP: menuItems.map(item => ( -->
+                            <div class="px-6 py-4 hover:bg-gray-50 transition-colors" data-mock="true">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-3">
+                                            <h4 class="text-base font-medium text-gray-900" data-bind="item.name">Margherita Pizza</h4>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                Available
+                                            </span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1" data-bind="item.description">Fresh tomatoes, mozzarella, and basil on our signature wood-fired crust</p>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <span class="text-lg font-semibold text-gray-900" data-bind="item.price">$18.99</span>
+                                            <span class="text-xs text-gray-500">Added 2 days ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 ml-4">
+                                        <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors" data-event="click:editItem" data-implementation="Should open edit modal">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="p-2 text-gray-400 hover:text-red-600 transition-colors" data-event="click:deleteItem" data-implementation="Should confirm before deletion">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="px-6 py-4 hover:bg-gray-50 transition-colors" data-mock="true">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-3">
+                                            <h4 class="text-base font-medium text-gray-900">Caesar Salad</h4>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                Available
+                                            </span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1">Crisp romaine lettuce, parmesan cheese, croutons, and our house Caesar dressing</p>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <span class="text-lg font-semibold text-gray-900">$12.99</span>
+                                            <span class="text-xs text-gray-500">Added 3 days ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 ml-4">
+                                        <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="px-6 py-4 hover:bg-gray-50 transition-colors" data-mock="true">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-3">
+                                            <h4 class="text-base font-medium text-gray-900">Tiramisu</h4>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                                Unavailable
+                                            </span>
+                                        </div>
+                                        <p class="text-sm text-gray-500 mt-1">Traditional Italian dessert with layers of coffee-soaked ladyfingers and mascarpone</p>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <span class="text-lg font-semibold text-gray-900">$8.99</span>
+                                            <span class="text-xs text-gray-500">Added 1 week ago</span>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center space-x-2 ml-4">
+                                        <button class="p-2 text-gray-400 hover:text-gray-600 transition-colors">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="p-2 text-gray-400 hover:text-red-600 transition-colors">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- @END_MAP )) -->
+                        </div>
+
+                        <!-- Empty state when no items -->
+                        <div class="px-6 py-12 text-center" data-mock="true" style="display: none;">
+                            <i class="fas fa-utensils text-gray-300 text-4xl mb-4"></i>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No menu items yet</h3>
+                            <p class="text-gray-500 mb-6">Get started by adding your first menu item</p>
+                            <button class="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors">
+                                <i class="fas fa-plus mr-2"></i>Add Your First Item
+                            </button>
+                        </div>
+                    </div>
+                    <!-- @END_COMPONENT: MenuManagement -->
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: AdminDashboard -->
+
+    <!-- Customer Menu View -->
+    <!-- @COMPONENT: CustomerMenu [restaurantSlug, menuItems, onOrderSubmit] -->
+    <div id="menu-view" class="min-h-screen bg-gray-50" style="display: none;">
+        <div class="max-w-2xl mx-auto px-4 py-8">
+            
+            <!-- Restaurant Header -->
+            <div class="text-center mb-8">
+                <!-- A warm and inviting restaurant interior with elegant table settings -->
+                <div class="w-24 h-24 mx-auto mb-4 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                    <img src="https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=400&h=400" 
+                         alt="Restaurant interior" 
+                         class="w-full h-full object-cover">
+                </div>
+                <h1 class="text-3xl font-bold text-gray-900 mb-2" data-bind="restaurant.name" data-mock="true">Bella's Italian Bistro</h1>
+                <p class="text-gray-600">Authentic Italian cuisine made with love</p>
+            </div>
+
+            <!-- Menu Categories -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden mb-8">
+                <div class="px-6 py-4 bg-primary-50 border-b border-primary-100">
+                    <h2 class="text-xl font-semibold text-gray-900">Our Menu</h2>
+                    <p class="text-sm text-gray-600 mt-1">Tap items to add to your order</p>
+                </div>
+
+                <div class="divide-y divide-gray-200">
+                    <!-- @MAP: menuItems.map(item => ( -->
+                    <div class="p-6 hover:bg-gray-50 transition-colors cursor-pointer" data-event="click:addToOrder" data-mock="true">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <h3 class="text-lg font-semibold text-gray-900" data-bind="item.name">Margherita Pizza</h3>
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                        <i class="fas fa-leaf mr-1"></i>Vegetarian
+                                    </span>
+                                </div>
+                                <p class="text-gray-600 text-sm mb-3" data-bind="item.description">Fresh tomatoes, mozzarella, and basil on our signature wood-fired crust</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xl font-bold text-primary-600" data-bind="item.price">$18.99</span>
+                                    <div class="flex items-center space-x-3">
+                                        <button class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors" data-event="click:decrementQuantity">
+                                            <i class="fas fa-minus text-gray-600 text-sm"></i>
+                                        </button>
+                                        <span class="w-8 text-center font-medium" data-bind="item.quantity" data-mock="true">1</span>
+                                        <button class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center hover:bg-primary-200 transition-colors" data-event="click:incrementQuantity">
+                                            <i class="fas fa-plus text-primary-600 text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6 hover:bg-gray-50 transition-colors cursor-pointer" data-mock="true">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <h3 class="text-lg font-semibold text-gray-900">Caesar Salad</h3>
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                        <i class="fas fa-leaf mr-1"></i>Fresh
+                                    </span>
+                                </div>
+                                <p class="text-gray-600 text-sm mb-3">Crisp romaine lettuce, parmesan cheese, croutons, and our house Caesar dressing</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xl font-bold text-primary-600">$12.99</span>
+                                    <div class="flex items-center space-x-3">
+                                        <button class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                                            <i class="fas fa-minus text-gray-600 text-sm"></i>
+                                        </button>
+                                        <span class="w-8 text-center font-medium">1</span>
+                                        <button class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center hover:bg-primary-200 transition-colors">
+                                            <i class="fas fa-plus text-primary-600 text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-6 hover:bg-gray-50 transition-colors cursor-pointer" data-mock="true">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-3 mb-2">
+                                    <h3 class="text-lg font-semibold text-gray-900">Chicken Parmigiana</h3>
+                                    <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                        <i class="fas fa-fire mr-1"></i>Popular
+                                    </span>
+                                </div>
+                                <p class="text-gray-600 text-sm mb-3">Breaded chicken breast topped with marinara sauce and melted mozzarella, served with pasta</p>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xl font-bold text-primary-600">$22.99</span>
+                                    <div class="flex items-center space-x-3">
+                                        <button class="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors">
+                                            <i class="fas fa-minus text-gray-600 text-sm"></i>
+                                        </button>
+                                        <span class="w-8 text-center font-medium">1</span>
+                                        <button class="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center hover:bg-primary-200 transition-colors">
+                                            <i class="fas fa-plus text-primary-600 text-sm"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- @END_MAP )) -->
+                </div>
+            </div>
+
+            <!-- Order Summary -->
+            <!-- @COMPONENT: OrderSummary [orderItems, total, onSubmitOrder] -->
+            <div class="bg-white rounded-2xl shadow-lg border border-gray-200 sticky bottom-4">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h3 class="text-lg font-semibold text-gray-900">Your Order</h3>
+                </div>
+                
+                <div class="px-6 py-4">
+                    <div class="space-y-3 mb-4" data-mock="true">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-sm bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center">1</span>
+                                <span class="font-medium">Margherita Pizza</span>
+                            </div>
+                            <span class="font-semibold">$18.99</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-sm bg-gray-100 rounded-full w-6 h-6 flex items-center justify-center">2</span>
+                                <span class="font-medium">Caesar Salad</span>
+                            </div>
+                            <span class="font-semibold">$25.98</span>
+                        </div>
+                    </div>
+                    
+                    <div class="border-t border-gray-200 pt-4">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-lg font-semibold">Total</span>
+                            <span class="text-2xl font-bold text-primary-600" data-bind="orderTotal" data-mock="true">$44.97</span>
+                        </div>
+                        
+                        <button class="w-full bg-primary-600 text-white py-4 rounded-xl font-semibold text-lg hover:bg-primary-700 transition-colors" 
+                                data-event="click:submitOrder" 
+                                data-implementation="Should process order submission">
+                            <i class="fas fa-shopping-cart mr-2"></i>Place Order
+                        </button>
+                        
+                        <p class="text-xs text-gray-500 text-center mt-2">
+                            This is a demo menu. No actual order will be processed.
+                        </p>
+                    </div>
+                </div>
+            </div>
+            <!-- @END_COMPONENT: OrderSummary -->
+
+        </div>
+    </div>
+    <!-- @END_COMPONENT: CustomerMenu -->
+
+    <!-- QR Code Modal -->
+    <!-- @COMPONENT: QRCodeModal [isOpen, qrCodeData, onClose] -->
+    <div id="qr-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" style="display: none;" data-mock="true">
+        <div class="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4 overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">QR Code Menu</h3>
+                <button class="text-gray-400 hover:text-gray-600 transition-colors" data-event="click:closeModal">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="px-6 py-8 text-center">
+                <div class="bg-white p-4 rounded-xl border-2 border-gray-200 inline-block mb-6">
+                    <!-- @FUNCTIONALITY: This should generate actual QR code using QRCode library -->
+                    <div class="w-48 h-48 bg-gray-100 flex items-center justify-center text-gray-500">
+                        <i class="fas fa-qrcode text-6xl"></i>
+                    </div>
+                </div>
+                
+                <h4 class="text-xl font-semibold text-gray-900 mb-2">Scan to View Menu</h4>
+                <p class="text-gray-600 mb-6">Customers can scan this QR code to view your menu instantly</p>
+                
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <button class="flex-1 bg-primary-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-primary-700 transition-colors" data-event="click:downloadQR">
+                        <i class="fas fa-download mr-2"></i>Download QR Code
+                    </button>
+                    <button class="flex-1 border border-gray-300 text-gray-700 py-3 px-4 rounded-lg font-medium hover:bg-gray-50 transition-colors" data-event="click:copyLink">
+                        <i class="fas fa-copy mr-2"></i>Copy Link
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- @END_COMPONENT: QRCodeModal -->
+
+    <script>
+    (function() {
+        // TODO: Implement Supabase connection and authentication
+        // TODO: Implement restaurant CRUD operations  
+        // TODO: Implement menu item CRUD operations
+        // TODO: Implement QR code generation
+        // TODO: Implement order management
+        // TODO: Implement session management and routing
+
+        // Demo functionality for UI interactions
+        document.addEventListener('DOMContentLoaded', function() {
+            
+            // Demo view switching
+            const authView = document.getElementById('auth-view');
+            const dashboardView = document.getElementById('dashboard-view');
+            const menuView = document.getElementById('menu-view');
+            
+            // Simulate login after 2 seconds for demo
+            setTimeout(() => {
+                authView.style.display = 'none';
+                dashboardView.style.display = 'block';
+            }, 2000);
+            
+            // QR Modal demo
+            const qrModal = document.getElementById('qr-modal');
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('[data-event*="generateQRCode"]')) {
+                    qrModal.style.display = 'flex';
+                }
+                if (e.target.closest('[data-event*="closeModal"]')) {
+                    qrModal.style.display = 'none';
+                }
+            });
+            
+        });
+
+    })();
+    </script>
+
+</body>
+</html>
