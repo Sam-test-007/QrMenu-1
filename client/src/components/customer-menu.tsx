@@ -166,7 +166,7 @@ export default function CustomerMenu() {
                         )}
                         <div className="flex items-center justify-between">
                           <span className="text-xl font-bold text-primary-600" data-testid={`text-item-price-${item.id}`}>
-                            ${currency(Number(item.price))}
+                            Rs{currency(Number(item.price))}
                           </span>
                           <div className="flex items-center space-x-3">
                             <Button
@@ -218,7 +218,7 @@ export default function CustomerMenu() {
                       <span className="font-medium">{item.name}</span>
                     </div>
                     <span className="font-semibold" data-testid={`order-item-total-${item.id}`}>
-                      ${(Number(item.price) * item.quantity).toFixed(2)}
+                      Rs{(Number(item.price) * item.quantity).toFixed(2)}
                     </span>
                   </div>
                 ))}
@@ -228,7 +228,7 @@ export default function CustomerMenu() {
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-lg font-semibold">Total</span>
                   <span className="text-2xl font-bold text-primary-600" data-testid="text-order-total">
-                    ${total.toFixed(2)}
+                    Rs{total.toFixed(2)}
                   </span>
                 </div>
                 

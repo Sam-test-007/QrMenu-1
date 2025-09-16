@@ -434,7 +434,7 @@ export default function AdminDashboard() {
                             />
                           </div>
                           <div>
-                            <Label>Price ($)</Label>
+                            <Label>Price (Rs)</Label>
                             <Input
                               type="number"
                               step="0.01"
@@ -537,7 +537,7 @@ export default function AdminDashboard() {
                               )}
                               <div className="flex items-center space-x-4 mt-2">
                                 <span className="text-lg font-semibold text-gray-900" data-testid={`text-item-price-${item.id}`}>
-                                  ${currency(Number(item.price))}
+                                  Rs{currency(Number(item.price))}
                                 </span>
                                 <span className="text-xs text-gray-500">
                                   Added {new Date(item.createdAt || "").toLocaleDateString()}
