@@ -38,6 +38,7 @@ export default function AdminDashboard() {
   const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -313,6 +314,34 @@ export default function AdminDashboard() {
     }
   };
 
+  const updateMenuItem = async (itemId: string, updatedData: Partial<MenuItem>) => {
+    try {
+      const { error } = await supabase
+        .from("menu_items")
+        .update(updatedData)
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      setMenuItems(prev => prev.map(item => 
+        item.id === itemId ? { ...item, ...updatedData } : item
+      ));
+      setEditingItem(null);
+      
+      toast({
+        title: "Success",
+        description: "Menu item updated successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -506,7 +535,7 @@ export default function AdminDashboard() {
                                     <Badge variant={
                                       order.status === 'pending' ? 'secondary' :
                                       order.status === 'preparing' ? 'default' :
-                                      'success'
+                                      'default'
                                     }>
                                       {order.status}
                                     </Badge>
@@ -586,7 +615,7 @@ export default function AdminDashboard() {
                                     <h4 className="font-medium">
                                       {order.table_number ? `Table ${order.table_number}` : 'No table'}
                                     </h4>
-                                    <Badge variant={order.status === 'completed' ? 'success' : 'destructive'}>
+                                    <Badge variant={order.status === 'completed' ? 'default' : 'destructive'}>
                                       {order.status}
                                     </Badge>
                                   </div>
@@ -725,7 +754,11 @@ export default function AdminDashboard() {
                     {/* Menu Items List */}
                     <div className="space-y-4">
                       {menuItems.map((item) => (
-                        <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-testid={`row-menu-item-${item.id}`}>
+                        <div key={item.id} 
+                          className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" 
+                          onClick={() => setEditingItem(item)}
+                          data-testid={`row-menu-item-${item.id}`}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-3">
@@ -737,7 +770,7 @@ export default function AdminDashboard() {
                                   />
                                 )}
                                 <div>
-                                  <h4 className="text-base font-medium text-gray-900" data-testid={`text-item-name-${item.id}`}>
+                                  <h4 className="text-base font-medium text-gray-900">
                                     {item.name}
                                   </h4>
                                   <Badge variant={item.available ? "default" : "secondary"}>
@@ -746,12 +779,12 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                               {item.description && (
-                                <p className="text-sm text-gray-500 mt-1" data-testid={`text-item-description-${item.id}`}>
+                                <p className="text-sm text-gray-500 mt-1">
                                   {item.description}
                                 </p>
                               )}
                               <div className="flex items-center space-x-4 mt-2">
-                                <span className="text-lg font-semibold text-gray-900" data-testid={`text-item-price-${item.id}`}>
+                                <span className="text-lg font-semibold text-gray-900">
                                   Rs{currency(Number(item.price))}
                                 </span>
                                 <span className="text-xs text-gray-500">
@@ -763,8 +796,10 @@ export default function AdminDashboard() {
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => deleteMenuItem(item.id)}
-                                data-testid={`button-delete-item-${item.id}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteMenuItem(item.id);
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
@@ -773,20 +808,83 @@ export default function AdminDashboard() {
                         </div>
                       ))}
 
-                      {/* Empty state when no items */}
-                      {menuItems.length === 0 && (
-                        <div className="text-center py-12">
-                          <Utensils className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                          <h3 className="text-lg font-medium text-gray-900 mb-2">No menu items yet</h3>
-                          <p className="text-gray-500 mb-6">Get started by adding your first menu item</p>
-                          <Button 
-                            onClick={() => setShowAddForm(true)}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            data-testid="button-add-first-item"
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Your First Item
-                          </Button>
+                      {/* Edit Item Modal */}
+                      {editingItem && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                            <h3 className="text-lg font-semibold mb-4">Edit Menu Item</h3>
+                            
+                            <div className="space-y-4">
+                              <div>
+                                <Label>Item Name</Label>
+                                <Input
+                                  value={editingItem.name}
+                                  onChange={(e) => setEditingItem(prev => 
+                                    prev ? { ...prev, name: e.target.value } : null
+                                  )}
+                                />
+                              </div>
+
+                              <div>
+                                <Label>Price (Rs)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={editingItem.price}
+                                  onChange={(e) => setEditingItem(prev => 
+                                    prev ? { ...prev, price: e.target.value } : null
+                                  )}
+                                />
+                              </div>
+
+                              <div>
+                                <Label>Description</Label>
+                                <Input
+                                  value={editingItem.description || ''}
+                                  onChange={(e) => setEditingItem(prev => 
+                                    prev ? { ...prev, description: e.target.value } : null
+                                  )}
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingItem.available ?? false}
+                                    onChange={(e) => setEditingItem(prev => 
+                                      prev ? { ...prev, available: e.target.checked } : null
+                                    )}
+                                    title="Available"
+                                  />
+                                  <span>Available</span>
+                                </Label>
+                              </div>
+
+                              <div className="flex justify-end space-x-3 mt-6">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => setEditingItem(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  onClick={() => {
+                                    if (editingItem) {
+                                      updateMenuItem(editingItem.id, {
+                                        name: editingItem.name,
+                                        price: editingItem.price,
+                                        description: editingItem.description,
+                                        available: editingItem.available
+                                      });
+                                    }
+                                  }}
+                                >
+                                  Save Changes
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
