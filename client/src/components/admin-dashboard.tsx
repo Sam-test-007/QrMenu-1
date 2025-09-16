@@ -13,11 +13,26 @@ import QRCodeGenerator from "./qr-code-generator";
 import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
 
+interface Order {
+  id: string;
+  table_number: string | null;
+  status: 'pending' | 'preparing' | 'completed' | 'cancelled';
+  total: number;
+  items: Array<{
+    id: string;
+    name: string;
+    price: string;
+    quantity: number;
+  }>;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
   const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
@@ -34,8 +49,27 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (selectedRestaurant) {
       loadMenuItems();
+      loadOrders();
+      
+      // Set up real-time subscription
+      const ordersSubscription = supabase
+        .channel('orders')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `restaurant_id=eq.${selectedRestaurant.id}`
+        }, () => {
+          loadOrders();
+        })
+        .subscribe();
+
+      return () => {
+        ordersSubscription.unsubscribe();
+      };
     } else {
       setMenuItems([]);
+      setOrders([]);
     }
   }, [selectedRestaurant]);
 
@@ -76,6 +110,27 @@ export default function AdminDashboard() {
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadOrders = async () => {
+    if (!selectedRestaurant) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('restaurant_id', selectedRestaurant.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load orders",
         variant: "destructive",
       });
     }
@@ -229,6 +284,30 @@ export default function AdminDashboard() {
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      
+      loadOrders(); // Reload orders after update
+      
+      toast({
+        title: "Success",
+        description: "Order status updated",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update order status",
         variant: "destructive",
       });
     }
@@ -404,6 +483,142 @@ export default function AdminDashboard() {
                     </div>
                   </CardContent>
                 </Card>
+
+                {/* Orders Section - Side by Side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Active Orders */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Active Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {orders
+                          .filter(order => order.status !== 'completed' && order.status !== 'cancelled')
+                          .map((order) => (
+                            <div key={order.id} className="p-4 border rounded-lg">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <div className="flex items-center space-x-3">
+                                    <h4 className="font-medium">
+                                      {order.table_number ? `Table ${order.table_number}` : 'No table'}
+                                    </h4>
+                                    <Badge variant={
+                                      order.status === 'pending' ? 'secondary' :
+                                      order.status === 'preparing' ? 'default' :
+                                      'success'
+                                    }>
+                                      {order.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Ordered at {new Date(order.created_at).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                <span className="font-bold text-lg">
+                                  Rs{order.total.toFixed(2)}
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {order.items.map((item) => (
+                                  <div key={item.id} className="flex justify-between text-sm">
+                                    <span>{item.quantity}x {item.name}</span>
+                                    <span>Rs{(Number(item.price) * item.quantity).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {order.status === 'pending' && (
+                                <div className="mt-4 flex space-x-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                  >
+                                    Start Preparing
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              )}
+
+                              {order.status === 'preparing' && (
+                                <Button
+                                  size="sm"
+                                  className="mt-4"
+                                  onClick={() => updateOrderStatus(order.id, 'completed')}
+                                >
+                                  Mark as Completed
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+
+                        {orders.filter(order => order.status !== 'completed' && order.status !== 'cancelled').length === 0 && (
+                          <div className="text-center py-6 text-gray-500">
+                            No active orders
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Recent Orders */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {orders
+                          .filter(order => order.status === 'completed' || order.status === 'cancelled')
+                          .slice(0, 5)
+                          .map((order) => (
+                            <div key={order.id} className="p-4 border rounded-lg">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <div className="flex items-center space-x-3">
+                                    <h4 className="font-medium">
+                                      {order.table_number ? `Table ${order.table_number}` : 'No table'}
+                                    </h4>
+                                    <Badge variant={order.status === 'completed' ? 'success' : 'destructive'}>
+                                      {order.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    {new Date(order.created_at).toLocaleString()}
+                                  </p>
+                                </div>
+                                <span className="font-bold text-lg">
+                                  Rs{order.total.toFixed(2)}
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {order.items.map((item) => (
+                                  <div key={item.id} className="flex justify-between text-sm">
+                                    <span>{item.quantity}x {item.name}</span>
+                                    <span>Rs{(Number(item.price) * item.quantity).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+
+                        {orders.filter(order => order.status === 'completed' || order.status === 'cancelled').length === 0 && (
+                          <div className="text-center py-6 text-gray-500">
+                            No completed orders
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
 
                 {/* Menu Management */}
                 <Card>

@@ -87,6 +87,56 @@ export default function CustomerMenu() {
     menu.items.filter(item => item.quantity > 0),
     [menu.items]
   );
+    // Add this after the existing itemsInOrder useMemo
+  const placeOrder = async () => {
+    if (!itemsInOrder.length || !slug) return;
+    
+    try {
+      const { data: restaurant, error: restaurantError } = await supabase
+        .from("restaurants")
+        .select("id")
+        .eq("slug", slug)
+        .single();
+
+      if (restaurantError || !restaurant) {
+        throw new Error("Restaurant not found");
+      }
+
+      const orderData = {
+        restaurant_id: restaurant.id,
+        table_number: tableNumber,
+        status: 'pending',
+        total: total,
+        items: itemsInOrder.map(item => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        }))
+      };
+
+      const { error: orderError } = await supabase
+        .from("orders")
+        .insert([orderData]);
+
+      if (orderError) {
+          console.error("Order error:",orderError);
+          throw new Error("Failed to create order.")
+      }
+
+      // Reset order after successful submission
+      setMenu(prev => ({
+        ...prev,
+        items: prev.items.map(item => ({ ...item, quantity: 0 }))
+      }));
+
+      alert("Order placed successfully! Please wait for your server.");
+  } catch (error: any) {
+      console.error("Error placing order:", error);
+      alert(error.message || "Failed to place order. Please try again.");
+      
+  }
+  };
 
   if (loading) {
     return (
@@ -232,9 +282,11 @@ export default function CustomerMenu() {
                   </span>
                 </div>
                 
+                {/* Replace the existing Place Order Button with: */}
                 <Button 
                   className="w-full py-4 text-lg font-semibold rounded-xl"
                   data-testid="button-place-order"
+                  onClick={placeOrder}
                 >
                   <ShoppingCart className="mr-2 h-5 w-5" />
                   Place Order
