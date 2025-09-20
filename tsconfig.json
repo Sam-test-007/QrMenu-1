@@ -9,6 +9,8 @@
     "strict": true,
     "lib": ["esnext", "dom", "dom.iterable"],
     "jsx": "preserve",
+    "forceConsistentCasingInFileNames": true,
+
     "esModuleInterop": true,
     "skipLibCheck": true,
     "allowImportingTsExtensions": true,

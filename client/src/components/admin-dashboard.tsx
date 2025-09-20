@@ -13,16 +13,32 @@ import QRCodeGenerator from "./qr-code-generator";
 import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
 
+interface Order {
+  id: string;
+  table_number: string | null;
+  status: 'pending' | 'preparing' | 'completed' | 'cancelled';
+  total: number;
+  items: Array<{
+    id: string;
+    name: string;
+    price: string;
+    quantity: number;
+  }>;
+  created_at: string;
+}
+
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
   const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -34,8 +50,27 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (selectedRestaurant) {
       loadMenuItems();
+      loadOrders();
+      
+      // Set up real-time subscription
+      const ordersSubscription = supabase
+        .channel('orders')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'orders',
+          filter: `restaurant_id=eq.${selectedRestaurant.id}`
+        }, () => {
+          loadOrders();
+        })
+        .subscribe();
+
+      return () => {
+        ordersSubscription.unsubscribe();
+      };
     } else {
       setMenuItems([]);
+      setOrders([]);
     }
   }, [selectedRestaurant]);
 
@@ -76,6 +111,27 @@ export default function AdminDashboard() {
       toast({
         title: "Error",
         description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadOrders = async () => {
+    if (!selectedRestaurant) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('restaurant_id', selectedRestaurant.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setOrders(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load orders",
         variant: "destructive",
       });
     }
@@ -224,6 +280,58 @@ export default function AdminDashboard() {
       toast({
         title: "Success",
         description: "Menu item deleted successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status })
+        .eq('id', orderId);
+
+      if (error) throw error;
+      
+      loadOrders(); // Reload orders after update
+      
+      toast({
+        title: "Success",
+        description: "Order status updated",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to update order status",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const updateMenuItem = async (itemId: string, updatedData: Partial<MenuItem>) => {
+    try {
+      const { error } = await supabase
+        .from("menu_items")
+        .update(updatedData)
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      // Update local state
+      setMenuItems(prev => prev.map(item => 
+        item.id === itemId ? { ...item, ...updatedData } : item
+      ));
+      setEditingItem(null);
+      
+      toast({
+        title: "Success",
+        description: "Menu item updated successfully!",
       });
     } catch (error: any) {
       toast({
@@ -405,6 +513,142 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
 
+                {/* Orders Section - Side by Side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Active Orders */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Active Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {orders
+                          .filter(order => order.status !== 'completed' && order.status !== 'cancelled')
+                          .map((order) => (
+                            <div key={order.id} className="p-4 border rounded-lg">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <div className="flex items-center space-x-3">
+                                    <h4 className="font-medium">
+                                      {order.table_number ? `Table ${order.table_number}` : 'No table'}
+                                    </h4>
+                                    <Badge variant={
+                                      order.status === 'pending' ? 'secondary' :
+                                      order.status === 'preparing' ? 'default' :
+                                      'default'
+                                    }>
+                                      {order.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Ordered at {new Date(order.created_at).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                <span className="font-bold text-lg">
+                                  Rs{order.total.toFixed(2)}
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {order.items.map((item) => (
+                                  <div key={item.id} className="flex justify-between text-sm">
+                                    <span>{item.quantity}x {item.name}</span>
+                                    <span>Rs{(Number(item.price) * item.quantity).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {order.status === 'pending' && (
+                                <div className="mt-4 flex space-x-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                  >
+                                    Start Preparing
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                  >
+                                    Cancel
+                                  </Button>
+                                </div>
+                              )}
+
+                              {order.status === 'preparing' && (
+                                <Button
+                                  size="sm"
+                                  className="mt-4"
+                                  onClick={() => updateOrderStatus(order.id, 'completed')}
+                                >
+                                  Mark as Completed
+                                </Button>
+                              )}
+                            </div>
+                          ))}
+
+                        {orders.filter(order => order.status !== 'completed' && order.status !== 'cancelled').length === 0 && (
+                          <div className="text-center py-6 text-gray-500">
+                            No active orders
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Recent Orders */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Recent Orders</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {orders
+                          .filter(order => order.status === 'completed' || order.status === 'cancelled')
+                          .slice(0, 5)
+                          .map((order) => (
+                            <div key={order.id} className="p-4 border rounded-lg">
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <div className="flex items-center space-x-3">
+                                    <h4 className="font-medium">
+                                      {order.table_number ? `Table ${order.table_number}` : 'No table'}
+                                    </h4>
+                                    <Badge variant={order.status === 'completed' ? 'default' : 'destructive'}>
+                                      {order.status}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    {new Date(order.created_at).toLocaleString()}
+                                  </p>
+                                </div>
+                                <span className="font-bold text-lg">
+                                  Rs{order.total.toFixed(2)}
+                                </span>
+                              </div>
+                              
+                              <div className="space-y-2">
+                                {order.items.map((item) => (
+                                  <div key={item.id} className="flex justify-between text-sm">
+                                    <span>{item.quantity}x {item.name}</span>
+                                    <span>Rs{(Number(item.price) * item.quantity).toFixed(2)}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+
+                        {orders.filter(order => order.status === 'completed' || order.status === 'cancelled').length === 0 && (
+                          <div className="text-center py-6 text-gray-500">
+                            No completed orders
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
                 {/* Menu Management */}
                 <Card>
                   <CardContent className="p-6">
@@ -434,7 +678,7 @@ export default function AdminDashboard() {
                             />
                           </div>
                           <div>
-                            <Label>Price ($)</Label>
+                            <Label>Price (Rs)</Label>
                             <Input
                               type="number"
                               step="0.01"
@@ -510,7 +754,11 @@ export default function AdminDashboard() {
                     {/* Menu Items List */}
                     <div className="space-y-4">
                       {menuItems.map((item) => (
-                        <div key={item.id} className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors" data-testid={`row-menu-item-${item.id}`}>
+                        <div key={item.id} 
+                          className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" 
+                          onClick={() => setEditingItem(item)}
+                          data-testid={`row-menu-item-${item.id}`}
+                        >
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center space-x-3">
@@ -522,7 +770,7 @@ export default function AdminDashboard() {
                                   />
                                 )}
                                 <div>
-                                  <h4 className="text-base font-medium text-gray-900" data-testid={`text-item-name-${item.id}`}>
+                                  <h4 className="text-base font-medium text-gray-900">
                                     {item.name}
                                   </h4>
                                   <Badge variant={item.available ? "default" : "secondary"}>
@@ -531,13 +779,13 @@ export default function AdminDashboard() {
                                 </div>
                               </div>
                               {item.description && (
-                                <p className="text-sm text-gray-500 mt-1" data-testid={`text-item-description-${item.id}`}>
+                                <p className="text-sm text-gray-500 mt-1">
                                   {item.description}
                                 </p>
                               )}
                               <div className="flex items-center space-x-4 mt-2">
-                                <span className="text-lg font-semibold text-gray-900" data-testid={`text-item-price-${item.id}`}>
-                                  ${currency(Number(item.price))}
+                                <span className="text-lg font-semibold text-gray-900">
+                                  Rs{currency(Number(item.price))}
                                 </span>
                                 <span className="text-xs text-gray-500">
                                   Added {new Date(item.createdAt || "").toLocaleDateString()}
@@ -548,8 +796,10 @@ export default function AdminDashboard() {
                               <Button 
                                 variant="ghost" 
                                 size="sm"
-                                onClick={() => deleteMenuItem(item.id)}
-                                data-testid={`button-delete-item-${item.id}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  deleteMenuItem(item.id);
+                                }}
                               >
                                 <Trash2 className="h-4 w-4 text-red-600" />
                               </Button>
@@ -558,20 +808,83 @@ export default function AdminDashboard() {
                         </div>
                       ))}
 
-                      {/* Empty state when no items */}
-                      {menuItems.length === 0 && (
-                        <div className="text-center py-12">
-                          <Utensils className="mx-auto h-12 w-12 text-gray-300 mb-4" />
-                          <h3 className="text-lg font-medium text-gray-900 mb-2">No menu items yet</h3>
-                          <p className="text-gray-500 mb-6">Get started by adding your first menu item</p>
-                          <Button 
-                            onClick={() => setShowAddForm(true)}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            data-testid="button-add-first-item"
-                          >
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Your First Item
-                          </Button>
+                      {/* Edit Item Modal */}
+                      {editingItem && (
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                            <h3 className="text-lg font-semibold mb-4">Edit Menu Item</h3>
+                            
+                            <div className="space-y-4">
+                              <div>
+                                <Label>Item Name</Label>
+                                <Input
+                                  value={editingItem.name}
+                                  onChange={(e) => setEditingItem(prev => 
+                                    prev ? { ...prev, name: e.target.value } : null
+                                  )}
+                                />
+                              </div>
+
+                              <div>
+                                <Label>Price (Rs)</Label>
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  value={editingItem.price}
+                                  onChange={(e) => setEditingItem(prev => 
+                                    prev ? { ...prev, price: e.target.value } : null
+                                  )}
+                                />
+                              </div>
+
+                              <div>
+                                <Label>Description</Label>
+                                <Input
+                                  value={editingItem.description || ''}
+                                  onChange={(e) => setEditingItem(prev => 
+                                    prev ? { ...prev, description: e.target.value } : null
+                                  )}
+                                />
+                              </div>
+
+                              <div>
+                                <Label className="flex items-center space-x-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingItem.available ?? false}
+                                    onChange={(e) => setEditingItem(prev => 
+                                      prev ? { ...prev, available: e.target.checked } : null
+                                    )}
+                                    title="Available"
+                                  />
+                                  <span>Available</span>
+                                </Label>
+                              </div>
+
+                              <div className="flex justify-end space-x-3 mt-6">
+                                <Button 
+                                  variant="outline" 
+                                  onClick={() => setEditingItem(null)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button 
+                                  onClick={() => {
+                                    if (editingItem) {
+                                      updateMenuItem(editingItem.id, {
+                                        name: editingItem.name,
+                                        price: editingItem.price,
+                                        description: editingItem.description,
+                                        available: editingItem.available
+                                      });
+                                    }
+                                  }}
+                                >
+                                  Save Changes
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       )}
                     </div>
