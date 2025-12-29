@@ -46,16 +46,63 @@ export default function QRCodeGenerator({ restaurant, menuItems }: QRCodeGenerat
 
   const handleDownloadQR = () => {
     const canvas = document.querySelector('#qr-code-canvas canvas') as HTMLCanvasElement;
-    if (canvas) {
-      const link = document.createElement('a');
-      const filename = tableNumber 
-        ? `${restaurant.slug}-table-${tableNumber}-qr.png`
-        : `${restaurant.slug}-qr-menu.png`;
-      link.download = filename;
-      link.href = canvas.toDataURL();
-      link.click();
+    if (!canvas) return;
+
+    // Create an offscreen canvas to compose QR + text
+    const qrSize = canvas.width; // includes margin
+    const padding = 24;
+    const textLines = [] as string[];
+    if (restaurant.name) textLines.push(restaurant.name);
+    if (tableNumber && tableNumber.trim()) textLines.push(`Table ${tableNumber.trim()}`);
+
+    const lineHeight = 20;
+    const textAreaHeight = textLines.length > 0 ? (textLines.length * lineHeight + padding) : 0;
+
+    const outWidth = qrSize + padding * 2;
+    const outHeight = qrSize + textAreaHeight + padding * 2;
+
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = outWidth;
+    outCanvas.height = outHeight;
+    const ctx = outCanvas.getContext('2d');
+    if (!ctx) return;
+
+    // fill background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, outWidth, outHeight);
+
+    // draw QR centered horizontally, leaving top padding
+    const qrX = padding;
+    const qrY = padding;
+
+    // draw existing QR canvas into the new canvas
+    ctx.drawImage(canvas, qrX, qrY, qrSize, qrSize);
+
+    // draw text centered below QR
+    if (textLines.length > 0) {
+      ctx.fillStyle = '#111827';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      const fontSize = 16;
+      ctx.font = `bold ${fontSize}px Inter, Arial, sans-serif`;
+      const centerX = outWidth / 2;
+      let ty = qrY + qrSize + 12;
+      for (const line of textLines) {
+        ctx.fillText(line, centerX, ty);
+        ty += lineHeight;
+      }
     }
+
+    const link = document.createElement('a');
+    const filename = tableNumber && tableNumber.trim()
+      ? `${restaurant.slug}-table-${tableNumber.trim()}-qr.png`
+      : `${restaurant.slug}-qr-menu.png`;
+    link.download = filename;
+    link.href = outCanvas.toDataURL('image/png');
+    link.click();
   };
+
+  
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -99,6 +146,8 @@ export default function QRCodeGenerator({ restaurant, menuItems }: QRCodeGenerat
                 includeMargin={true}
               />
             </div>
+              {/* Live composed preview (downloaded image preview) */}
+              
             
             <div>
               <h4 className="text-xl font-semibold text-gray-900 mb-2">

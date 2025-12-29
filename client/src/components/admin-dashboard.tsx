@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/lib/supabase";
@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, User, LogOut, Plus, Utensils, Calendar, ExternalLink, Trash2 } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { QrCode, User, LogOut, Plus, Utensils, Calendar, ExternalLink, Trash2, X, HelpCircle } from "lucide-react";
 import QRCodeGenerator from "./qr-code-generator";
 import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
@@ -39,7 +40,120 @@ export default function AdminDashboard() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+  const [showMenuPanel, setShowMenuPanel] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('menuPanelOpen') === 'true';
+    } catch (e) {
+      return false;
+    }
+  });
+
+  // Onboarding tour state
+  const [showTour, setShowTour] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+
+  // accessibility refs for menu panel focus management
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const prevFocusedRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    try {
+      const seen = localStorage.getItem('qrmenu_seen_tour');
+      if (!seen) {
+        setShowTour(true);
+      }
+    } catch (e) {}
+  }, []);
+
+  const finishTour = () => {
+    try {
+      localStorage.setItem('qrmenu_seen_tour', '1');
+    } catch (e) {}
+    setShowTour(false);
+    setTourStep(0);
+  };
+  const [tick, setTick] = useState(Date.now());
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const { toast } = useToast();
+
+  // keep a small timer so the "today" count resets soon after midnight
+  useEffect(() => {
+    const id = setInterval(() => setTick(Date.now()), 60_000); // update every minute
+    return () => clearInterval(id);
+  }, []);
+
+  // persist panel open state
+  useEffect(() => {
+    try {
+      localStorage.setItem('menuPanelOpen', showMenuPanel ? 'true' : 'false');
+    } catch (e) {}
+  }, [showMenuPanel]);
+
+  // close on Escape and trap basic focus behavior
+  useEffect(() => {
+    if (!showMenuPanel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowMenuPanel(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showMenuPanel]);
+
+  // Focus trap and return-focus for the menu panel
+  useEffect(() => {
+    if (!showMenuPanel) return;
+    const el = panelRef.current;
+    prevFocusedRef.current = document.activeElement as HTMLElement | null;
+
+    // find focusable elements inside panel
+    const focusableSelector = 'a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])';
+    const focusable = el ? Array.from(el.querySelectorAll<HTMLElement>(focusableSelector)).filter(f => !f.hasAttribute('disabled')) : [];
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (first) first.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Tab' && focusable.length) {
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+
+    el?.addEventListener('keydown', onKey);
+    return () => {
+      el?.removeEventListener('keydown', onKey);
+      try { prevFocusedRef.current?.focus(); } catch (e) {}
+    };
+  }, [showMenuPanel]);
+
+  // recalc today's completed orders whenever orders or time tick updates
+  useEffect(() => {
+    const now = new Date();
+    const count = orders.filter((o) => {
+      try {
+        const d = new Date(o.created_at);
+        return (
+          d.getFullYear() === now.getFullYear() &&
+          d.getMonth() === now.getMonth() &&
+          d.getDate() === now.getDate() &&
+          o.status === 'completed'
+        );
+      } catch (e) {
+        return false;
+      }
+    }).length;
+    setTodayCompletedCount(count);
+  }, [orders, tick]);
+
+  // total sales sum across fetched orders
+  const totalSales = useMemo(() => {
+    return orders.reduce((s, o) => s + Number(o.total || 0), 0);
+  }, [orders]);
 
   useEffect(() => {
     if (user) {
@@ -292,13 +406,26 @@ export default function AdminDashboard() {
 
   const updateOrderStatus = async (orderId: string, status: Order['status']) => {
     try {
+      const existingOrder = orders.find(o => o.id === orderId);
       const { error } = await supabase
         .from('orders')
         .update({ status })
         .eq('id', orderId);
 
       if (error) throw error;
-      
+      // optimistic local increment for today's completed counter
+      if (status === 'completed' && existingOrder) {
+        try {
+          const d = new Date(existingOrder.created_at);
+          const now = new Date();
+          if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+            setTodayCompletedCount(prev => prev + 1);
+          }
+        } catch (e) {
+          // ignore parse errors
+        }
+      }
+
       loadOrders(); // Reload orders after update
       
       toast({
@@ -373,10 +500,16 @@ export default function AdminDashboard() {
                   {user?.email}
                 </span>
               </div>
-              <Button variant="ghost" onClick={signOut} data-testid="button-signout">
-                <LogOut className="mr-1 h-4 w-4" />
-                Sign Out
-              </Button>
+                <div className="flex items-center space-x-2">
+                  <Button variant="ghost" onClick={() => setShowTour(true)} title="Help / Tour">
+                    <HelpCircle className="mr-1 h-4 w-4" />
+                    Help
+                  </Button>
+                  <Button variant="ghost" onClick={signOut} data-testid="button-signout">
+                    <LogOut className="mr-1 h-4 w-4" />
+                    Sign Out
+                  </Button>
+                </div>
             </div>
           </div>
         </div>
@@ -496,9 +629,68 @@ export default function AdminDashboard() {
                           <span>/{selectedRestaurant.slug}</span>
                         </p>
                         <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-                          <span><Utensils className="inline mr-1 h-4 w-4" />{menuItems.length} menu items</span>
+                            <span><Utensils className="inline mr-1 h-4 w-4" />{menuItems.length} menu items</span>
+                            <span className="ml-3"><Calendar className="inline mr-1 h-4 w-4" />Today's completed: <strong className="text-gray-900">{todayCompletedCount}</strong></span>
+                        </div>
+                        {/* Compact stats row */}
+                        <div className="mt-4 flex items-center space-x-6 text-sm text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <Utensils className="h-4 w-4 text-gray-500" />
+                            <span>Total orders: <strong className="text-gray-900">{orders.length}</strong></span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span>Total sales: <strong className="text-gray-900">Rs{totalSales.toFixed(2)}</strong></span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Badge variant="secondary">Active</Badge>
+                            <span><strong className="text-gray-900">{orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length}</strong></span>
+                          </div>
                         </div>
                       </div>
+                      {/* Help / Onboarding dialog */}
+                      <Dialog open={showTour} onOpenChange={(open) => { setShowTour(open); if (!open) finishTour(); }}>
+                        <DialogContent className="max-w-lg">
+                          <DialogHeader>
+                            <DialogTitle>Quick Tour</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            {tourStep === 0 && (
+                              <div>
+                                <h4 className="font-semibold">Restaurants</h4>
+                                <p className="text-sm text-gray-600">Select a restaurant from the left to manage its menu and orders.</p>
+                              </div>
+                            )}
+                            {tourStep === 1 && (
+                              <div>
+                                <h4 className="font-semibold">Menu Panel</h4>
+                                <p className="text-sm text-gray-600">Open the Menu panel to add, edit, and delete menu items. On mobile it appears as a bottom sheet.</p>
+                              </div>
+                            )}
+                            {tourStep === 2 && (
+                              <div>
+                                <h4 className="font-semibold">Orders</h4>
+                                <p className="text-sm text-gray-600">View active and recent orders. Use the action buttons to update status.</p>
+                              </div>
+                            )}
+
+                            <div className="flex justify-between">
+                              <div>
+                                {tourStep > 0 && (
+                                  <Button variant="ghost" onClick={() => setTourStep(s => Math.max(0, s - 1))}>Back</Button>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Button variant="outline" onClick={() => { finishTour(); }}>Skip</Button>
+                                {tourStep < 2 ? (
+                                  <Button onClick={() => setTourStep(s => s + 1)}>Next</Button>
+                                ) : (
+                                  <Button onClick={() => finishTour()}>Finish</Button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
                       
                       <div className="flex flex-col sm:flex-row gap-3">
                         <Button variant="outline" asChild data-testid="link-view-public">
@@ -516,10 +708,11 @@ export default function AdminDashboard() {
                 {/* Orders Section - Side by Side */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Active Orders */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Active Orders</CardTitle>
-                    </CardHeader>
+                  <section role="region" aria-labelledby="active-orders-title">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle id="active-orders-title">Active Orders</CardTitle>
+                      </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         {orders
@@ -563,6 +756,7 @@ export default function AdminDashboard() {
                                   <Button
                                     size="sm"
                                     onClick={() => updateOrderStatus(order.id, 'preparing')}
+                                    title="Start preparing this order"
                                   >
                                     Start Preparing
                                   </Button>
@@ -570,6 +764,7 @@ export default function AdminDashboard() {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => updateOrderStatus(order.id, 'cancelled')}
+                                    title="Cancel this order"
                                   >
                                     Cancel
                                   </Button>
@@ -581,6 +776,7 @@ export default function AdminDashboard() {
                                   size="sm"
                                   className="mt-4"
                                   onClick={() => updateOrderStatus(order.id, 'completed')}
+                                  title="Mark order as completed"
                                 >
                                   Mark as Completed
                                 </Button>
@@ -597,11 +793,14 @@ export default function AdminDashboard() {
                     </CardContent>
                   </Card>
 
+                  </section>
+
                   {/* Recent Orders */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Recent Orders</CardTitle>
-                    </CardHeader>
+                  <section role="region" aria-labelledby="recent-orders-title">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle id="recent-orders-title">Recent Orders</CardTitle>
+                      </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
                         {orders
@@ -647,249 +846,181 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
+                  </section>
                 </div>
 
-                {/* Menu Management */}
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
-                      <h3 className="text-lg font-semibold">Menu Items</h3>
-                      <Button 
-                        onClick={() => setShowAddForm(!showAddForm)}
-                        className="bg-emerald-600 hover:bg-emerald-700"
-                        data-testid="button-toggle-add-form"
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add Item
-                      </Button>
-                    </div>
+                {/* Menu Panel Toggle + Panel (moved to left side) */}
+                {/* Toggle button */}
+                <div>
+                  <button
+                    onClick={() => setShowMenuPanel(true)}
+                    aria-label="Open menu panel"
+                    title="Open Menu"
+                    className="fixed left-4 top-1/3 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl"
+                  >
+                    <Utensils className="h-5 w-5 text-gray-700" />
+                    <span className="hidden md:inline text-sm font-medium text-gray-700">Menu</span>
+                  </button>
 
-                    {/* Add Item Form */}
-                    {showAddForm && (
-                      <div className="mb-6 p-6 bg-emerald-50 border border-emerald-200 rounded-lg">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Item Name</Label>
-                            <Input
-                              placeholder="e.g., Margherita Pizza"
-                              value={newItem.name}
-                              onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
-                              data-testid="input-item-name"
-                            />
-                          </div>
-                          <div>
-                            <Label>Price (Rs)</Label>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              placeholder="0.00"
-                              value={newItem.price}
-                              onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
-                              data-testid="input-item-price"
-                            />
-                          </div>
-                        </div>
-                        <div className="mt-4">
-                          <Label>Description (Optional)</Label>
-                          <Input
-                            placeholder="Brief description of the item..."
-                            value={newItem.description}
-                            onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
-                            data-testid="input-item-description"
-                          />
-                        </div>
-                        <div className="mt-4">
-                          <Label>Image (Optional)</Label>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={async (e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const imageUrl = await uploadImage(file);
-                                if (imageUrl) {
-                                  setNewItem(prev => ({ ...prev, imageUrl }));
-                                }
-                              }
-                            }}
-                            data-testid="input-item-image"
-                            disabled={uploadingImage}
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Accepted formats: JPG, PNG, WebP, GIF. Max size: 200KB
-                          </p>
-                          {uploadingImage && (
-                            <p className="text-sm text-gray-500 mt-1">Uploading image...</p>
-                          )}
-                          {newItem.imageUrl && (
-                            <div className="mt-2">
-                              <img 
-                                src={newItem.imageUrl} 
-                                alt="Preview"
-                                className="w-16 h-16 rounded-lg object-cover"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex justify-end space-x-3 mt-4">
-                          <Button 
-                            variant="outline" 
-                            onClick={() => setShowAddForm(false)}
-                            data-testid="button-cancel-add"
+                  {/* overlay */}
+                  {showMenuPanel && (
+                    <div
+                      className="fixed inset-0 z-30 bg-black bg-opacity-30"
+                      aria-hidden
+                      onClick={() => setShowMenuPanel(false)}
+                    />
+                  )}
+
+                  {/* Panel */}
+                  <div className={`fixed z-40 transition-transform duration-300 ${showMenuPanel ? 'translate-x-0 translate-y-0' : '-translate-x-full translate-y-full'} lg:inset-y-0 lg:left-0 lg:w-80 lg:h-full sm:inset-x-0 sm:bottom-0 sm:h-1/2`}>
+                    <div className="w-full lg:w-80 h-full bg-white shadow-xl overflow-auto rounded-t-lg lg:rounded-none">
+                      <div className="p-4 border-b flex items-center justify-between">
+                        <h3 id="menu-panel-title" className="text-lg font-semibold">Menu Items</h3>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowAddForm(!showAddForm)}
+                            title="Add new menu item"
                           >
-                            Cancel
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Item
                           </Button>
-                          <Button 
-                            onClick={addMenuItem}
-                            className="bg-emerald-600 hover:bg-emerald-700"
-                            data-testid="button-save-item"
-                            disabled={uploadingImage}
-                          >
-                            {uploadingImage ? "Uploading..." : "Add Item"}
+                          <Button variant="ghost" size="sm" onClick={() => setShowMenuPanel(false)} title="Close menu panel">
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
-                    )}
 
-                    {/* Menu Items List */}
-                    <div className="space-y-4">
-                      {menuItems.map((item) => (
-                        <div key={item.id} 
-                          className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" 
-                          onClick={() => setEditingItem(item)}
-                          data-testid={`row-menu-item-${item.id}`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3">
-                                {item.imageUrl && (
-                                  <img 
-                                    src={item.imageUrl} 
-                                    alt={item.name}
-                                    className="w-12 h-12 rounded-lg object-cover"
-                                  />
-                                )}
-                                <div>
-                                  <h4 className="text-base font-medium text-gray-900">
-                                    {item.name}
-                                  </h4>
-                                  <Badge variant={item.available ? "default" : "secondary"}>
-                                    {item.available ? "Available" : "Unavailable"}
-                                  </Badge>
-                                </div>
-                              </div>
-                              {item.description && (
-                                <p className="text-sm text-gray-500 mt-1">
-                                  {item.description}
-                                </p>
-                              )}
-                              <div className="flex items-center space-x-4 mt-2">
-                                <span className="text-lg font-semibold text-gray-900">
-                                  Rs{currency(Number(item.price))}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  Added {new Date(item.createdAt || "").toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-2 ml-4">
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  deleteMenuItem(item.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {/* Edit Item Modal */}
-                      {editingItem && (
-                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                            <h3 className="text-lg font-semibold mb-4">Edit Menu Item</h3>
-                            
-                            <div className="space-y-4">
+                      <div className="p-4" id="menu-panel" role="dialog" aria-modal="true" aria-labelledby="menu-panel-title" ref={panelRef} tabIndex={-1}>
+                        <p className="text-xs text-gray-500 mb-3">Tip: tap the <strong>Menu</strong> button to open this panel. On phones this opens as a bottom sheet.</p>
+                        {/* Add Item Form */}
+                        {showAddForm && (
+                          <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <div className="grid grid-cols-1 gap-3">
                               <div>
                                 <Label>Item Name</Label>
                                 <Input
-                                  value={editingItem.name}
-                                  onChange={(e) => setEditingItem(prev => 
-                                    prev ? { ...prev, name: e.target.value } : null
-                                  )}
+                                  placeholder="e.g., Margherita Pizza"
+                                  value={newItem.name}
+                                  onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
                                 />
                               </div>
-
                               <div>
                                 <Label>Price (Rs)</Label>
                                 <Input
                                   type="number"
                                   step="0.01"
-                                  value={editingItem.price}
-                                  onChange={(e) => setEditingItem(prev => 
-                                    prev ? { ...prev, price: e.target.value } : null
-                                  )}
+                                  placeholder="0.00"
+                                  value={newItem.price}
+                                  onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
                                 />
                               </div>
-
                               <div>
-                                <Label>Description</Label>
+                                <Label>Description (Optional)</Label>
                                 <Input
-                                  value={editingItem.description || ''}
-                                  onChange={(e) => setEditingItem(prev => 
-                                    prev ? { ...prev, description: e.target.value } : null
-                                  )}
+                                  placeholder="Brief description of the item..."
+                                  value={newItem.description}
+                                  onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
                                 />
                               </div>
-
                               <div>
-                                <Label className="flex items-center space-x-2">
-                                  <input
-                                    type="checkbox"
-                                    checked={editingItem.available ?? false}
-                                    onChange={(e) => setEditingItem(prev => 
-                                      prev ? { ...prev, available: e.target.checked } : null
-                                    )}
-                                    title="Available"
-                                  />
-                                  <span>Available</span>
-                                </Label>
-                              </div>
-
-                              <div className="flex justify-end space-x-3 mt-6">
-                                <Button 
-                                  variant="outline" 
-                                  onClick={() => setEditingItem(null)}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button 
-                                  onClick={() => {
-                                    if (editingItem) {
-                                      updateMenuItem(editingItem.id, {
-                                        name: editingItem.name,
-                                        price: editingItem.price,
-                                        description: editingItem.description,
-                                        available: editingItem.available
-                                      });
+                                <Label>Image (Optional)</Label>
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const imageUrl = await uploadImage(file);
+                                      if (imageUrl) {
+                                        setNewItem(prev => ({ ...prev, imageUrl }));
+                                      }
                                     }
                                   }}
-                                >
-                                  Save Changes
-                                </Button>
+                                  disabled={uploadingImage}
+                                />
+                                <p className="text-xs text-gray-500 mt-1">Accepted formats: JPG, PNG, WebP, GIF. Max size: 200KB</p>
+                                {uploadingImage && <p className="text-sm text-gray-500 mt-1">Uploading image...</p>}
+                                {newItem.imageUrl && (
+                                  <div className="mt-2">
+                                    <img src={newItem.imageUrl} alt="Preview" className="w-16 h-16 rounded-lg object-cover" loading="lazy" />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex justify-end space-x-2 mt-2">
+                                <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
+                                <Button onClick={addMenuItem} className="bg-emerald-600 hover:bg-emerald-700" disabled={uploadingImage}>{uploadingImage ? 'Uploading...' : 'Add Item'}</Button>
                               </div>
                             </div>
                           </div>
+                        )}
+
+                        {/* Menu Items List */}
+                        <div className="space-y-3">
+                          {menuItems.map((item) => (
+                            <div key={item.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setEditingItem(item)}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-3">
+                                    {item.imageUrl && <img src={item.imageUrl} alt={item.name} className="w-10 h-10 rounded-lg object-cover" loading="lazy" />}
+                                    <div>
+                                      <h4 className="text-sm font-medium text-gray-900">{item.name}</h4>
+                                      <Badge variant={item.available ? 'default' : 'secondary'}>{item.available ? 'Available' : 'Unavailable'}</Badge>
+                                    </div>
+                                  </div>
+                                  {item.description && <p className="text-xs text-gray-500 mt-1">{item.description}</p>}
+                                  <div className="flex items-center space-x-2 mt-2">
+                                    <span className="text-sm font-semibold">Rs{currency(Number(item.price))}</span>
+                                    <span className="text-xs text-gray-500">Added {new Date(item.createdAt || '').toLocaleDateString()}</span>
+                                  </div>
+                                </div>
+                                <div className="ml-2">
+                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); deleteMenuItem(item.id); }} title="Delete item">
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+
+                          {/* Edit Item Modal (reused) */}
+                          {editingItem && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+                                <h3 className="text-lg font-semibold mb-4">Edit Menu Item</h3>
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label>Item Name</Label>
+                                    <Input value={editingItem.name} onChange={(e) => setEditingItem(prev => prev ? { ...prev, name: e.target.value } : null)} />
+                                  </div>
+                                  <div>
+                                    <Label>Price (Rs)</Label>
+                                    <Input type="number" step="0.01" value={editingItem.price} onChange={(e) => setEditingItem(prev => prev ? { ...prev, price: e.target.value } : null)} />
+                                  </div>
+                                  <div>
+                                    <Label>Description</Label>
+                                    <Input value={editingItem.description || ''} onChange={(e) => setEditingItem(prev => prev ? { ...prev, description: e.target.value } : null)} />
+                                  </div>
+                                  <div>
+                                    <Label className="flex items-center space-x-2">
+                                      <input type="checkbox" checked={editingItem.available ?? false} onChange={(e) => setEditingItem(prev => prev ? { ...prev, available: e.target.checked } : null)} />
+                                      <span>Available</span>
+                                    </Label>
+                                  </div>
+                                  <div className="flex justify-end space-x-3 mt-6">
+                                    <Button variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
+                                    <Button onClick={() => { if (editingItem) { updateMenuItem(editingItem.id, { name: editingItem.name, price: editingItem.price, description: editingItem.description, available: editingItem.available }); } }}>Save Changes</Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               </>
             ) : (
               <Card>
