@@ -60,6 +60,7 @@ export default function AdminDashboard() {
     imageUrl: "",
   });
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [uploadingRestImage, setUploadingRestImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [showMenuPanel, setShowMenuPanel] = useState<boolean>(() => {
@@ -100,6 +101,7 @@ export default function AdminDashboard() {
     new Date().toISOString().slice(0, 10)
   );
   const { toast } = useToast();
+  const restImageInputRef = useRef<HTMLInputElement | null>(null);
 
   // keep a small timer so the "today" count resets soon after midnight
   useEffect(() => {
@@ -459,6 +461,58 @@ export default function AdminDashboard() {
     }
   };
 
+  const uploadRestaurantImage = async (file: File): Promise<string | null> => {
+    if (!selectedRestaurant) return null;
+
+    const maxSize = 500 * 1024; // 500KB limit for restaurant image
+    if (file.size > maxSize) {
+      toast({
+        title: "File too large",
+        description: `Image must be smaller than ${Math.round(
+          maxSize / 1024
+        )}KB.`,
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select an image file.",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    try {
+      setUploadingRestImage(true);
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${selectedRestaurant.id}/${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from("restaurant-images")
+        .upload(fileName, file, { upsert: true });
+
+      if (error) throw error;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("restaurant-images").getPublicUrl(fileName);
+
+      return publicUrl;
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: `Failed to upload image: ${error.message}`,
+        variant: "destructive",
+      });
+      return null;
+    } finally {
+      setUploadingRestImage(false);
+    }
+  };
+
   const addMenuItem = async () => {
     if (!selectedRestaurant || !newItem.name || !newItem.price) {
       toast({
@@ -795,12 +849,89 @@ export default function AdminDashboard() {
                   <CardContent className="p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                       <div className="mb-4 sm:mb-0">
-                        <h2
-                          className="text-2xl font-bold text-gray-900"
-                          data-testid="text-selected-restaurant-name"
-                        >
-                          {selectedRestaurant.name}
-                        </h2>
+                        <div className="flex items-center space-x-4">
+                          <div className="relative">
+                            {selectedRestaurant.image_url ? (
+                              <img
+                                src={selectedRestaurant.image_url}
+                                alt={selectedRestaurant.name}
+                                className="w-20 h-20 rounded-lg object-cover border"
+                              />
+                            ) : (
+                              <div className="w-20 h-20 rounded-lg bg-gray-100 flex items-center justify-center border">
+                                <Utensils className="h-6 w-6 text-gray-500" />
+                              </div>
+                            )}
+
+                            <div className="absolute right-0 bottom-0">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() =>
+                                  restImageInputRef.current?.click()
+                                }
+                                disabled={uploadingRestImage}
+                                title="Upload restaurant image"
+                              >
+                                {uploadingRestImage ? "Uploading..." : "Upload"}
+                              </Button>
+                            </div>
+                            <input
+                              ref={restImageInputRef}
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file || !selectedRestaurant) return;
+                                const url = await uploadRestaurantImage(file);
+                                if (url) {
+                                  try {
+                                    const { error } = await supabase
+                                      .from("restaurants")
+                                      .update({ image_url: url })
+                                      .eq("id", selectedRestaurant.id);
+                                    if (error) throw error;
+
+                                    setSelectedRestaurant((prev) =>
+                                      prev ? { ...prev, image_url: url } : prev
+                                    );
+                                    setRestaurants((prev) =>
+                                      prev.map((r) =>
+                                        r.id === selectedRestaurant.id
+                                          ? { ...r, image_url: url }
+                                          : r
+                                      )
+                                    );
+                                    toast({
+                                      title: "Success",
+                                      description: "Restaurant image updated",
+                                    });
+                                  } catch (err: any) {
+                                    toast({
+                                      title: "Error",
+                                      description:
+                                        err.message || "Failed to save image",
+                                      variant: "destructive",
+                                    });
+                                  }
+                                }
+                              }}
+                            />
+                          </div>
+
+                          <div>
+                            <h2
+                              className="text-2xl font-bold text-gray-900"
+                              data-testid="text-selected-restaurant-name"
+                            >
+                              {selectedRestaurant.name}
+                            </h2>
+                            <p className="text-gray-600 mt-1">
+                              <span>/{selectedRestaurant.slug}</span>
+                            </p>
+                          </div>
+                        </div>
                         <p className="text-gray-600 mt-1">
                           <span>/{selectedRestaurant.slug}</span>
                         </p>
