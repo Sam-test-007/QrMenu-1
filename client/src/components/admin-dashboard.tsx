@@ -944,28 +944,31 @@ export default function AdminDashboard() {
                             View Public Menu
                           </Link>
                         </Button>
-                        <QRCodeGenerator
-                          restaurant={selectedRestaurant}
-                          menuItems={menuItems}
-                        />
 
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="date"
-                            value={reportDate}
-                            onChange={(e) => setReportDate(e.target.value)}
-                            className="border rounded-md p-2 text-sm"
-                            aria-label="Select report date"
-                            data-testid="input-report-date"
+                        <div className="flex flex-col">
+                          <QRCodeGenerator
+                            restaurant={selectedRestaurant}
+                            menuItems={menuItems}
                           />
-                          <Button
-                            size="sm"
-                            onClick={() => downloadOrdersForDate(reportDate)}
-                            title="Download orders for date"
-                            data-testid="button-download-orders"
-                          >
-                            Download Orders
-                          </Button>
+
+                          <div className="mt-2 flex items-center space-x-2">
+                            <input
+                              type="date"
+                              value={reportDate}
+                              onChange={(e) => setReportDate(e.target.value)}
+                              className="border rounded-md p-2 text-sm"
+                              aria-label="Select report date"
+                              data-testid="input-report-date"
+                            />
+                            <Button
+                              size="sm"
+                              onClick={() => downloadOrdersForDate(reportDate)}
+                              title="Download orders for date"
+                              data-testid="button-download-orders"
+                            >
+                              Download Orders
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
