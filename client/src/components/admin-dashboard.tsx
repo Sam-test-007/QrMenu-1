@@ -8,8 +8,24 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { QrCode, User, LogOut, Plus, Utensils, Calendar, ExternalLink, Trash2, X, HelpCircle } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  QrCode,
+  User,
+  LogOut,
+  Plus,
+  Utensils,
+  Calendar,
+  ExternalLink,
+  Trash2,
+  X,
+  HelpCircle,
+} from "lucide-react";
 import QRCodeGenerator from "./qr-code-generator";
 import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
@@ -17,7 +33,7 @@ import { currency } from "@/lib/supabase";
 interface Order {
   id: string;
   table_number: string | null;
-  status: 'pending' | 'preparing' | 'completed' | 'cancelled';
+  status: "pending" | "preparing" | "completed" | "cancelled";
   total: number;
   items: Array<{
     id: string;
@@ -31,18 +47,24 @@ interface Order {
 export default function AdminDashboard() {
   const { user, signOut } = useAuth();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [selectedRestaurant, setSelectedRestaurant] =
+    useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
-  const [newItem, setNewItem] = useState({ name: "", price: "", description: "", imageUrl: "" });
+  const [newItem, setNewItem] = useState({
+    name: "",
+    price: "",
+    description: "",
+    imageUrl: "",
+  });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
   const [showMenuPanel, setShowMenuPanel] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('menuPanelOpen') === 'true';
+      return localStorage.getItem("menuPanelOpen") === "true";
     } catch (e) {
       return false;
     }
@@ -58,7 +80,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     try {
-      const seen = localStorage.getItem('qrmenu_seen_tour');
+      const seen = localStorage.getItem("qrmenu_seen_tour");
       if (!seen) {
         setShowTour(true);
       }
@@ -67,13 +89,16 @@ export default function AdminDashboard() {
 
   const finishTour = () => {
     try {
-      localStorage.setItem('qrmenu_seen_tour', '1');
+      localStorage.setItem("qrmenu_seen_tour", "1");
     } catch (e) {}
     setShowTour(false);
     setTourStep(0);
   };
   const [tick, setTick] = useState(Date.now());
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [reportDate, setReportDate] = useState<string>(() =>
+    new Date().toISOString().slice(0, 10)
+  );
   const { toast } = useToast();
 
   // keep a small timer so the "today" count resets soon after midnight
@@ -85,7 +110,7 @@ export default function AdminDashboard() {
   // persist panel open state
   useEffect(() => {
     try {
-      localStorage.setItem('menuPanelOpen', showMenuPanel ? 'true' : 'false');
+      localStorage.setItem("menuPanelOpen", showMenuPanel ? "true" : "false");
     } catch (e) {}
   }, [showMenuPanel]);
 
@@ -93,10 +118,10 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!showMenuPanel) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setShowMenuPanel(false);
+      if (e.key === "Escape") setShowMenuPanel(false);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [showMenuPanel]);
 
   // Focus trap and return-focus for the menu panel
@@ -106,14 +131,19 @@ export default function AdminDashboard() {
     prevFocusedRef.current = document.activeElement as HTMLElement | null;
 
     // find focusable elements inside panel
-    const focusableSelector = 'a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])';
-    const focusable = el ? Array.from(el.querySelectorAll<HTMLElement>(focusableSelector)).filter(f => !f.hasAttribute('disabled')) : [];
+    const focusableSelector =
+      'a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])';
+    const focusable = el
+      ? Array.from(el.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+          (f) => !f.hasAttribute("disabled")
+        )
+      : [];
     const first = focusable[0];
     const last = focusable[focusable.length - 1];
     if (first) first.focus();
 
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Tab' && focusable.length) {
+      if (e.key === "Tab" && focusable.length) {
         if (e.shiftKey && document.activeElement === first) {
           e.preventDefault();
           last?.focus();
@@ -124,10 +154,12 @@ export default function AdminDashboard() {
       }
     };
 
-    el?.addEventListener('keydown', onKey);
+    el?.addEventListener("keydown", onKey);
     return () => {
-      el?.removeEventListener('keydown', onKey);
-      try { prevFocusedRef.current?.focus(); } catch (e) {}
+      el?.removeEventListener("keydown", onKey);
+      try {
+        prevFocusedRef.current?.focus();
+      } catch (e) {}
     };
   }, [showMenuPanel]);
 
@@ -141,7 +173,7 @@ export default function AdminDashboard() {
           d.getFullYear() === now.getFullYear() &&
           d.getMonth() === now.getMonth() &&
           d.getDate() === now.getDate() &&
-          o.status === 'completed'
+          o.status === "completed"
         );
       } catch (e) {
         return false;
@@ -165,18 +197,22 @@ export default function AdminDashboard() {
     if (selectedRestaurant) {
       loadMenuItems();
       loadOrders();
-      
+
       // Set up real-time subscription
       const ordersSubscription = supabase
-        .channel('orders')
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'orders',
-          filter: `restaurant_id=eq.${selectedRestaurant.id}`
-        }, () => {
-          loadOrders();
-        })
+        .channel("orders")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "orders",
+            filter: `restaurant_id=eq.${selectedRestaurant.id}`,
+          },
+          () => {
+            loadOrders();
+          }
+        )
         .subscribe();
 
       return () => {
@@ -230,15 +266,94 @@ export default function AdminDashboard() {
     }
   };
 
+  const downloadOrdersForDate = (dateStr: string) => {
+    try {
+      if (!selectedRestaurant) {
+        toast({
+          title: "No restaurant selected",
+          description: "Select a restaurant first",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const filtered = orders.filter((o) => {
+        try {
+          return new Date(o.created_at).toISOString().slice(0, 10) === dateStr;
+        } catch (e) {
+          return false;
+        }
+      });
+
+      if (!filtered.length) {
+        toast({
+          title: "No orders",
+          description: `No orders found for ${dateStr}`,
+          variant: "default",
+        });
+      }
+
+      const header = [
+        "order_id",
+        "table_number",
+        "status",
+        "total",
+        "created_at",
+        "items",
+      ];
+      const rows = filtered.map((o) => {
+        const itemsStr = o.items
+          .map(
+            (i) => `${i.quantity}x ${i.name} (Rs${Number(i.price).toFixed(2)})`
+          )
+          .join(" | ");
+        return [
+          o.id,
+          o.table_number ?? "",
+          o.status,
+          Number(o.total).toFixed(2),
+          o.created_at,
+          itemsStr,
+        ];
+      });
+
+      const csv = [header, ...rows]
+        .map((r) =>
+          r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")
+        )
+        .join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orders-${selectedRestaurant.slug}-${dateStr}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download started",
+        description: `Orders for ${dateStr} are downloading.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to generate file",
+        variant: "destructive",
+      });
+    }
+  };
+
   const loadOrders = async () => {
     if (!selectedRestaurant) return;
 
     try {
       const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('restaurant_id', selectedRestaurant.id)
-        .order('created_at', { ascending: false });
+        .from("orders")
+        .select("*")
+        .eq("restaurant_id", selectedRestaurant.id)
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setOrders(data || []);
@@ -264,16 +379,18 @@ export default function AdminDashboard() {
     try {
       const { data, error } = await supabase
         .from("restaurants")
-        .insert([{
-          owner_id: user?.id,
-          name: newRestaurant.name,
-          slug: newRestaurant.slug
-        }])
+        .insert([
+          {
+            owner_id: user?.id,
+            name: newRestaurant.name,
+            slug: newRestaurant.slug,
+          },
+        ])
         .select()
         .single();
 
       if (error) throw error;
-      setRestaurants(prev => [data, ...prev]);
+      setRestaurants((prev) => [data, ...prev]);
       setNewRestaurant({ name: "", slug: "" });
       toast({
         title: "Success",
@@ -296,14 +413,16 @@ export default function AdminDashboard() {
     if (file.size > maxSize) {
       toast({
         title: "File too large",
-        description: `Image must be smaller than 200KB. Your file is ${Math.round(file.size / 1024)}KB.`,
+        description: `Image must be smaller than 200KB. Your file is ${Math.round(
+          file.size / 1024
+        )}KB.`,
         variant: "destructive",
       });
       return null;
     }
 
     // Check if file is an image
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith("image/")) {
       toast({
         title: "Invalid file type",
         description: "Please select an image file (PNG, JPG, JPEG, WebP, etc.)",
@@ -314,18 +433,18 @@ export default function AdminDashboard() {
 
     try {
       setUploadingImage(true);
-      const fileExt = file.name.split('.').pop();
+      const fileExt = file.name.split(".").pop();
       const fileName = `${selectedRestaurant.id}/${Date.now()}.${fileExt}`;
 
       const { data, error } = await supabase.storage
-        .from('menu-images')
+        .from("menu-images")
         .upload(fileName, file);
 
       if (error) throw error;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('menu-images')
-        .getPublicUrl(fileName);
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("menu-images").getPublicUrl(fileName);
 
       return publicUrl;
     } catch (error: any) {
@@ -353,18 +472,20 @@ export default function AdminDashboard() {
     try {
       const { data, error } = await supabase
         .from("menu_items")
-        .insert([{
-          restaurant_id: selectedRestaurant.id,
-          name: newItem.name,
-          price: newItem.price,
-          description: newItem.description || null,
-          image_url: newItem.imageUrl || null
-        }])
+        .insert([
+          {
+            restaurant_id: selectedRestaurant.id,
+            name: newItem.name,
+            price: newItem.price,
+            description: newItem.description || null,
+            image_url: newItem.imageUrl || null,
+          },
+        ])
         .select()
         .single();
 
       if (error) throw error;
-      setMenuItems(prev => [...prev, data]);
+      setMenuItems((prev) => [...prev, data]);
       setNewItem({ name: "", price: "", description: "", imageUrl: "" });
       setShowAddForm(false);
       toast({
@@ -384,13 +505,10 @@ export default function AdminDashboard() {
     if (!confirm("Are you sure you want to delete this item?")) return;
 
     try {
-      const { error } = await supabase
-        .from("menu_items")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("menu_items").delete().eq("id", id);
 
       if (error) throw error;
-      setMenuItems(prev => prev.filter(item => item.id !== id));
+      setMenuItems((prev) => prev.filter((item) => item.id !== id));
       toast({
         title: "Success",
         description: "Menu item deleted successfully!",
@@ -404,22 +522,29 @@ export default function AdminDashboard() {
     }
   };
 
-  const updateOrderStatus = async (orderId: string, status: Order['status']) => {
+  const updateOrderStatus = async (
+    orderId: string,
+    status: Order["status"]
+  ) => {
     try {
-      const existingOrder = orders.find(o => o.id === orderId);
+      const existingOrder = orders.find((o) => o.id === orderId);
       const { error } = await supabase
-        .from('orders')
+        .from("orders")
         .update({ status })
-        .eq('id', orderId);
+        .eq("id", orderId);
 
       if (error) throw error;
       // optimistic local increment for today's completed counter
-      if (status === 'completed' && existingOrder) {
+      if (status === "completed" && existingOrder) {
         try {
           const d = new Date(existingOrder.created_at);
           const now = new Date();
-          if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
-            setTodayCompletedCount(prev => prev + 1);
+          if (
+            d.getFullYear() === now.getFullYear() &&
+            d.getMonth() === now.getMonth() &&
+            d.getDate() === now.getDate()
+          ) {
+            setTodayCompletedCount((prev) => prev + 1);
           }
         } catch (e) {
           // ignore parse errors
@@ -427,7 +552,7 @@ export default function AdminDashboard() {
       }
 
       loadOrders(); // Reload orders after update
-      
+
       toast({
         title: "Success",
         description: "Order status updated",
@@ -441,7 +566,10 @@ export default function AdminDashboard() {
     }
   };
 
-  const updateMenuItem = async (itemId: string, updatedData: Partial<MenuItem>) => {
+  const updateMenuItem = async (
+    itemId: string,
+    updatedData: Partial<MenuItem>
+  ) => {
     try {
       const { error } = await supabase
         .from("menu_items")
@@ -451,11 +579,13 @@ export default function AdminDashboard() {
       if (error) throw error;
 
       // Update local state
-      setMenuItems(prev => prev.map(item => 
-        item.id === itemId ? { ...item, ...updatedData } : item
-      ));
+      setMenuItems((prev) =>
+        prev.map((item) =>
+          item.id === itemId ? { ...item, ...updatedData } : item
+        )
+      );
       setEditingItem(null);
-      
+
       toast({
         title: "Success",
         description: "Menu item updated successfully!",
@@ -488,7 +618,9 @@ export default function AdminDashboard() {
                 <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center mr-3">
                   <QrCode className="text-white h-4 w-4" />
                 </div>
-                <h1 className="text-xl font-bold text-gray-900">QR Menu SaaS</h1>
+                <h1 className="text-xl font-bold text-gray-900">
+                  QR Menu SaaS
+                </h1>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -496,20 +628,31 @@ export default function AdminDashboard() {
                 <div className="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
                   <User className="text-gray-600 h-4 w-4" />
                 </div>
-                <span className="text-sm text-gray-700" data-testid="text-user-email">
+                <span
+                  className="text-sm text-gray-700"
+                  data-testid="text-user-email"
+                >
                   {user?.email}
                 </span>
               </div>
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" onClick={() => setShowTour(true)} title="Help / Tour">
-                    <HelpCircle className="mr-1 h-4 w-4" />
-                    Help
-                  </Button>
-                  <Button variant="ghost" onClick={signOut} data-testid="button-signout">
-                    <LogOut className="mr-1 h-4 w-4" />
-                    Sign Out
-                  </Button>
-                </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowTour(true)}
+                  title="Help / Tour"
+                >
+                  <HelpCircle className="mr-1 h-4 w-4" />
+                  Help
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={signOut}
+                  data-testid="button-signout"
+                >
+                  <LogOut className="mr-1 h-4 w-4" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -517,7 +660,6 @@ export default function AdminDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
           {/* Restaurant Sidebar */}
           <div className="lg:col-span-1">
             <Card>
@@ -527,27 +669,43 @@ export default function AdminDashboard() {
               <CardContent className="p-0">
                 <div className="p-4 space-y-3 max-h-96 overflow-y-auto">
                   {restaurants.map((restaurant) => (
-                    <div 
+                    <div
                       key={restaurant.id}
                       className={`p-4 border rounded-lg hover:border-primary-300 transition-colors cursor-pointer ${
-                        selectedRestaurant?.id === restaurant.id ? "border-primary-300 bg-primary-50" : "border-gray-200"
+                        selectedRestaurant?.id === restaurant.id
+                          ? "border-primary-300 bg-primary-50"
+                          : "border-gray-200"
                       }`}
                       onClick={() => setSelectedRestaurant(restaurant)}
                       data-testid={`card-restaurant-${restaurant.id}`}
                     >
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
-                          <h4 className="font-medium text-gray-900" data-testid={`text-restaurant-name-${restaurant.id}`}>
+                          <h4
+                            className="font-medium text-gray-900"
+                            data-testid={`text-restaurant-name-${restaurant.id}`}
+                          >
                             {restaurant.name}
                           </h4>
-                          <p className="text-sm text-gray-500 mt-1">/{restaurant.slug}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            /{restaurant.slug}
+                          </p>
                           <div className="flex items-center mt-2 space-x-4 text-xs text-gray-500">
-                            <span><Utensils className="inline mr-1 h-3 w-3" />{menuItems.length} items</span>
-                            <span><Calendar className="inline mr-1 h-3 w-3" />Created {new Date(restaurant.createdAt || "").toLocaleDateString()}</span>
+                            <span>
+                              <Utensils className="inline mr-1 h-3 w-3" />
+                              {menuItems.length} items
+                            </span>
+                            <span>
+                              <Calendar className="inline mr-1 h-3 w-3" />
+                              Created{" "}
+                              {new Date(
+                                restaurant.createdAt || ""
+                              ).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
-                        <Button 
-                          variant="ghost" 
+                        <Button
+                          variant="ghost"
                           size="sm"
                           onClick={(e) => {
                             e.stopPropagation();
@@ -560,7 +718,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   ))}
-                  
+
                   {restaurants.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                       No restaurants yet. Create your first one below!
@@ -571,25 +729,36 @@ export default function AdminDashboard() {
                 {/* Create New Restaurant Form - Only show if user has no restaurant */}
                 {restaurants.length === 0 && (
                   <div className="px-6 py-4 border-t border-gray-200 bg-gray-50">
-                    <h4 className="text-sm font-semibold text-gray-900 mb-3">Create Your Restaurant</h4>
+                    <h4 className="text-sm font-semibold text-gray-900 mb-3">
+                      Create Your Restaurant
+                    </h4>
                     <div className="space-y-3">
                       <Input
                         placeholder="Restaurant name"
                         value={newRestaurant.name}
-                        onChange={(e) => setNewRestaurant(prev => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) =>
+                          setNewRestaurant((prev) => ({
+                            ...prev,
+                            name: e.target.value,
+                          }))
+                        }
                         data-testid="input-restaurant-name"
                       />
                       <Input
                         placeholder="URL slug (e.g., my-restaurant)"
                         value={newRestaurant.slug}
-                        onChange={(e) => setNewRestaurant(prev => ({ 
-                          ...prev, 
-                          slug: e.target.value.replace(/\s+/g, "-").toLowerCase()
-                        }))}
+                        onChange={(e) =>
+                          setNewRestaurant((prev) => ({
+                            ...prev,
+                            slug: e.target.value
+                              .replace(/\s+/g, "-")
+                              .toLowerCase(),
+                          }))
+                        }
                         data-testid="input-restaurant-slug"
                       />
-                      <Button 
-                        onClick={createRestaurant} 
+                      <Button
+                        onClick={createRestaurant}
                         className="w-full bg-emerald-600 hover:bg-emerald-700"
                         data-testid="button-create-restaurant"
                       >
@@ -604,8 +773,12 @@ export default function AdminDashboard() {
                 {restaurants.length > 0 && (
                   <div className="px-6 py-4 border-t border-gray-200 bg-blue-50">
                     <div className="text-center">
-                      <p className="text-sm text-blue-700 font-medium">Restaurant Created</p>
-                      <p className="text-xs text-blue-600 mt-1">You can manage one restaurant per account</p>
+                      <p className="text-sm text-blue-700 font-medium">
+                        Restaurant Created
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        You can manage one restaurant per account
+                      </p>
                     </div>
                   </div>
                 )}
@@ -622,33 +795,71 @@ export default function AdminDashboard() {
                   <CardContent className="p-6">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
                       <div className="mb-4 sm:mb-0">
-                        <h2 className="text-2xl font-bold text-gray-900" data-testid="text-selected-restaurant-name">
+                        <h2
+                          className="text-2xl font-bold text-gray-900"
+                          data-testid="text-selected-restaurant-name"
+                        >
                           {selectedRestaurant.name}
                         </h2>
                         <p className="text-gray-600 mt-1">
                           <span>/{selectedRestaurant.slug}</span>
                         </p>
                         <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
-                            <span><Utensils className="inline mr-1 h-4 w-4" />{menuItems.length} menu items</span>
-                            <span className="ml-3"><Calendar className="inline mr-1 h-4 w-4" />Today's completed: <strong className="text-gray-900">{todayCompletedCount}</strong></span>
+                          <span>
+                            <Utensils className="inline mr-1 h-4 w-4" />
+                            {menuItems.length} menu items
+                          </span>
+                          <span className="ml-3">
+                            <Calendar className="inline mr-1 h-4 w-4" />
+                            Today's completed:{" "}
+                            <strong className="text-gray-900">
+                              {todayCompletedCount}
+                            </strong>
+                          </span>
                         </div>
                         {/* Compact stats row */}
                         <div className="mt-4 flex items-center space-x-6 text-sm text-gray-600">
                           <div className="flex items-center space-x-2">
                             <Utensils className="h-4 w-4 text-gray-500" />
-                            <span>Total orders: <strong className="text-gray-900">{orders.length}</strong></span>
+                            <span>
+                              Total orders:{" "}
+                              <strong className="text-gray-900">
+                                {orders.length}
+                              </strong>
+                            </span>
                           </div>
                           <div className="flex items-center space-x-2">
-                            <span>Total sales: <strong className="text-gray-900">Rs{totalSales.toFixed(2)}</strong></span>
+                            <span>
+                              Total sales:{" "}
+                              <strong className="text-gray-900">
+                                Rs{totalSales.toFixed(2)}
+                              </strong>
+                            </span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Badge variant="secondary">Active</Badge>
-                            <span><strong className="text-gray-900">{orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled').length}</strong></span>
+                            <span>
+                              <strong className="text-gray-900">
+                                {
+                                  orders.filter(
+                                    (o) =>
+                                      o.status !== "completed" &&
+                                      o.status !== "cancelled"
+                                  ).length
+                                }
+                              </strong>
+                            </span>
                           </div>
                         </div>
                       </div>
                       {/* Help / Onboarding dialog */}
-                      <Dialog open={showTour} onOpenChange={(open) => { setShowTour(open); if (!open) finishTour(); }}>
+                      <Dialog
+                        open={showTour}
+                        onOpenChange={(open) => {
+                          setShowTour(open);
+                          if (!open) finishTour();
+                        }}
+                      >
                         <DialogContent className="max-w-lg">
                           <DialogHeader>
                             <DialogTitle>Quick Tour</DialogTitle>
@@ -657,49 +868,105 @@ export default function AdminDashboard() {
                             {tourStep === 0 && (
                               <div>
                                 <h4 className="font-semibold">Restaurants</h4>
-                                <p className="text-sm text-gray-600">Select a restaurant from the left to manage its menu and orders.</p>
+                                <p className="text-sm text-gray-600">
+                                  Select a restaurant from the left to manage
+                                  its menu and orders.
+                                </p>
                               </div>
                             )}
                             {tourStep === 1 && (
                               <div>
                                 <h4 className="font-semibold">Menu Panel</h4>
-                                <p className="text-sm text-gray-600">Open the Menu panel to add, edit, and delete menu items. On mobile it appears as a bottom sheet.</p>
+                                <p className="text-sm text-gray-600">
+                                  Open the Menu panel to add, edit, and delete
+                                  menu items. On mobile it appears as a bottom
+                                  sheet.
+                                </p>
                               </div>
                             )}
                             {tourStep === 2 && (
                               <div>
                                 <h4 className="font-semibold">Orders</h4>
-                                <p className="text-sm text-gray-600">View active and recent orders. Use the action buttons to update status.</p>
+                                <p className="text-sm text-gray-600">
+                                  View active and recent orders. Use the action
+                                  buttons to update status.
+                                </p>
                               </div>
                             )}
 
                             <div className="flex justify-between">
                               <div>
                                 {tourStep > 0 && (
-                                  <Button variant="ghost" onClick={() => setTourStep(s => Math.max(0, s - 1))}>Back</Button>
+                                  <Button
+                                    variant="ghost"
+                                    onClick={() =>
+                                      setTourStep((s) => Math.max(0, s - 1))
+                                    }
+                                  >
+                                    Back
+                                  </Button>
                                 )}
                               </div>
                               <div className="flex items-center space-x-2">
-                                <Button variant="outline" onClick={() => { finishTour(); }}>Skip</Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => {
+                                    finishTour();
+                                  }}
+                                >
+                                  Skip
+                                </Button>
                                 {tourStep < 2 ? (
-                                  <Button onClick={() => setTourStep(s => s + 1)}>Next</Button>
+                                  <Button
+                                    onClick={() => setTourStep((s) => s + 1)}
+                                  >
+                                    Next
+                                  </Button>
                                 ) : (
-                                  <Button onClick={() => finishTour()}>Finish</Button>
+                                  <Button onClick={() => finishTour()}>
+                                    Finish
+                                  </Button>
                                 )}
                               </div>
                             </div>
                           </div>
                         </DialogContent>
                       </Dialog>
-                      
-                      <div className="flex flex-col sm:flex-row gap-3">
-                        <Button variant="outline" asChild data-testid="link-view-public">
+
+                      <div className="flex flex-col sm:flex-row gap-3 items-center">
+                        <Button
+                          variant="outline"
+                          asChild
+                          data-testid="link-view-public"
+                        >
                           <Link to={`/menu/${selectedRestaurant.slug}`}>
                             <ExternalLink className="mr-2 h-4 w-4" />
                             View Public Menu
                           </Link>
                         </Button>
-                        <QRCodeGenerator restaurant={selectedRestaurant} menuItems={menuItems} />
+                        <QRCodeGenerator
+                          restaurant={selectedRestaurant}
+                          menuItems={menuItems}
+                        />
+
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="date"
+                            value={reportDate}
+                            onChange={(e) => setReportDate(e.target.value)}
+                            className="border rounded-md p-2 text-sm"
+                            aria-label="Select report date"
+                            data-testid="input-report-date"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => downloadOrdersForDate(reportDate)}
+                            title="Download orders for date"
+                            data-testid="button-download-orders"
+                          >
+                            Download Orders
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -711,156 +978,230 @@ export default function AdminDashboard() {
                   <section role="region" aria-labelledby="active-orders-title">
                     <Card>
                       <CardHeader>
-                        <CardTitle id="active-orders-title">Active Orders</CardTitle>
+                        <CardTitle id="active-orders-title">
+                          Active Orders
+                        </CardTitle>
                       </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {orders
-                          .filter(order => order.status !== 'completed' && order.status !== 'cancelled')
-                          .map((order) => (
-                            <div key={order.id} className="p-4 border rounded-lg">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <div className="flex items-center space-x-3">
-                                    <h4 className="font-medium">
-                                      {order.table_number ? `Table ${order.table_number}` : 'No table'}
-                                    </h4>
-                                    <Badge variant={
-                                      order.status === 'pending' ? 'secondary' :
-                                      order.status === 'preparing' ? 'default' :
-                                      'default'
-                                    }>
-                                      {order.status}
-                                    </Badge>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {orders
+                            .filter(
+                              (order) =>
+                                order.status !== "completed" &&
+                                order.status !== "cancelled"
+                            )
+                            .map((order) => (
+                              <div
+                                key={order.id}
+                                className="p-4 border rounded-lg"
+                              >
+                                <div className="flex justify-between items-start mb-4">
+                                  <div>
+                                    <div className="flex items-center space-x-3">
+                                      <h4 className="font-medium">
+                                        {order.table_number
+                                          ? `Table ${order.table_number}`
+                                          : "No table"}
+                                      </h4>
+                                      <Badge
+                                        variant={
+                                          order.status === "pending"
+                                            ? "secondary"
+                                            : order.status === "preparing"
+                                            ? "default"
+                                            : "default"
+                                        }
+                                      >
+                                        {order.status}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      Ordered at{" "}
+                                      {new Date(
+                                        order.created_at
+                                      ).toLocaleTimeString()}
+                                    </p>
                                   </div>
-                                  <p className="text-sm text-gray-500 mt-1">
-                                    Ordered at {new Date(order.created_at).toLocaleTimeString()}
-                                  </p>
+                                  <span className="font-bold text-lg">
+                                    Rs{order.total.toFixed(2)}
+                                  </span>
                                 </div>
-                                <span className="font-bold text-lg">
-                                  Rs{order.total.toFixed(2)}
-                                </span>
-                              </div>
-                              
-                              <div className="space-y-2">
-                                {order.items.map((item) => (
-                                  <div key={item.id} className="flex justify-between text-sm">
-                                    <span>{item.quantity}x {item.name}</span>
-                                    <span>Rs{(Number(item.price) * item.quantity).toFixed(2)}</span>
-                                  </div>
-                                ))}
-                              </div>
 
-                              {order.status === 'pending' && (
-                                <div className="mt-4 flex space-x-2">
+                                <div className="space-y-2">
+                                  {order.items.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex justify-between text-sm"
+                                    >
+                                      <span>
+                                        {item.quantity}x {item.name}
+                                      </span>
+                                      <span>
+                                        Rs
+                                        {(
+                                          Number(item.price) * item.quantity
+                                        ).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {order.status === "pending" && (
+                                  <div className="mt-4 flex space-x-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        updateOrderStatus(order.id, "preparing")
+                                      }
+                                      title="Start preparing this order"
+                                    >
+                                      Start Preparing
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        updateOrderStatus(order.id, "cancelled")
+                                      }
+                                      title="Cancel this order"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {order.status === "preparing" && (
                                   <Button
                                     size="sm"
-                                    onClick={() => updateOrderStatus(order.id, 'preparing')}
-                                    title="Start preparing this order"
+                                    className="mt-4"
+                                    onClick={() =>
+                                      updateOrderStatus(order.id, "completed")
+                                    }
+                                    title="Mark order as completed"
                                   >
-                                    Start Preparing
+                                    Mark as Completed
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => updateOrderStatus(order.id, 'cancelled')}
-                                    title="Cancel this order"
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              )}
+                                )}
+                              </div>
+                            ))}
 
-                              {order.status === 'preparing' && (
-                                <Button
-                                  size="sm"
-                                  className="mt-4"
-                                  onClick={() => updateOrderStatus(order.id, 'completed')}
-                                  title="Mark order as completed"
-                                >
-                                  Mark as Completed
-                                </Button>
-                              )}
+                          {orders.filter(
+                            (order) =>
+                              order.status !== "completed" &&
+                              order.status !== "cancelled"
+                          ).length === 0 && (
+                            <div className="text-center py-6 text-gray-500">
+                              No active orders
                             </div>
-                          ))}
-
-                        {orders.filter(order => order.status !== 'completed' && order.status !== 'cancelled').length === 0 && (
-                          <div className="text-center py-6 text-gray-500">
-                            No active orders
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   </section>
 
                   {/* Recent Orders */}
                   <section role="region" aria-labelledby="recent-orders-title">
                     <Card>
                       <CardHeader>
-                        <CardTitle id="recent-orders-title">Recent Orders</CardTitle>
+                        <CardTitle id="recent-orders-title">
+                          Recent Orders
+                        </CardTitle>
                       </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {orders
-                          .filter(order => order.status === 'completed' || order.status === 'cancelled')
-                          .slice(0, 5)
-                          .map((order) => (
-                            <div key={order.id} className="p-4 border rounded-lg">
-                              <div className="flex justify-between items-start mb-4">
-                                <div>
-                                  <div className="flex items-center space-x-3">
-                                    <h4 className="font-medium">
-                                      {order.table_number ? `Table ${order.table_number}` : 'No table'}
-                                    </h4>
-                                    <Badge variant={order.status === 'completed' ? 'default' : 'destructive'}>
-                                      {order.status}
-                                    </Badge>
+                      <CardContent>
+                        <div className="space-y-4">
+                          {orders
+                            .filter(
+                              (order) =>
+                                order.status === "completed" ||
+                                order.status === "cancelled"
+                            )
+                            .slice(0, 5)
+                            .map((order) => (
+                              <div
+                                key={order.id}
+                                className="p-4 border rounded-lg"
+                              >
+                                <div className="flex justify-between items-start mb-4">
+                                  <div>
+                                    <div className="flex items-center space-x-3">
+                                      <h4 className="font-medium">
+                                        {order.table_number
+                                          ? `Table ${order.table_number}`
+                                          : "No table"}
+                                      </h4>
+                                      <Badge
+                                        variant={
+                                          order.status === "completed"
+                                            ? "default"
+                                            : "destructive"
+                                        }
+                                      >
+                                        {order.status}
+                                      </Badge>
+                                    </div>
+                                    <p className="text-sm text-gray-500 mt-1">
+                                      {new Date(
+                                        order.created_at
+                                      ).toLocaleString()}
+                                    </p>
                                   </div>
-                                  <p className="text-sm text-gray-500 mt-1">
-                                    {new Date(order.created_at).toLocaleString()}
-                                  </p>
+                                  <span className="font-bold text-lg">
+                                    Rs{order.total.toFixed(2)}
+                                  </span>
                                 </div>
-                                <span className="font-bold text-lg">
-                                  Rs{order.total.toFixed(2)}
-                                </span>
-                              </div>
-                              
-                              <div className="space-y-2">
-                                {order.items.map((item) => (
-                                  <div key={item.id} className="flex justify-between text-sm">
-                                    <span>{item.quantity}x {item.name}</span>
-                                    <span>Rs{(Number(item.price) * item.quantity).toFixed(2)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
 
-                        {orders.filter(order => order.status === 'completed' || order.status === 'cancelled').length === 0 && (
-                          <div className="text-center py-6 text-gray-500">
-                            No completed orders
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
+                                <div className="space-y-2">
+                                  {order.items.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex justify-between text-sm"
+                                    >
+                                      <span>
+                                        {item.quantity}x {item.name}
+                                      </span>
+                                      <span>
+                                        Rs
+                                        {(
+                                          Number(item.price) * item.quantity
+                                        ).toFixed(2)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ))}
+
+                          {orders.filter(
+                            (order) =>
+                              order.status === "completed" ||
+                              order.status === "cancelled"
+                          ).length === 0 && (
+                            <div className="text-center py-6 text-gray-500">
+                              No completed orders
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   </section>
                 </div>
 
                 {/* Menu Panel Toggle + Panel (moved to left side) */}
                 {/* Toggle button */}
                 <div>
-                  <button
-                    onClick={() => setShowMenuPanel(true)}
-                    aria-label="Open menu panel"
-                    title="Open Menu"
-                    className="fixed left-4 top-1/3 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl"
-                  >
-                    <Utensils className="h-5 w-5 text-gray-700" />
-                    <span className="hidden md:inline text-sm font-medium text-gray-700">Menu</span>
-                  </button>
+                  {!showMenuPanel && (
+                    <button
+                      onClick={() => setShowMenuPanel(true)}
+                      aria-label="Open menu panel"
+                      title="Open Menu"
+                      className="fixed left-4 top-1/3 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl"
+                    >
+                      <Utensils className="h-5 w-5 text-gray-700" />
+                      <span className="hidden md:inline text-sm font-medium text-gray-700">
+                        Menu
+                      </span>
+                    </button>
+                  )}
 
                   {/* overlay */}
                   {showMenuPanel && (
@@ -872,10 +1213,21 @@ export default function AdminDashboard() {
                   )}
 
                   {/* Panel */}
-                  <div className={`fixed z-40 transition-transform duration-300 ${showMenuPanel ? 'translate-x-0 translate-y-0' : '-translate-x-full translate-y-full'} lg:inset-y-0 lg:left-0 lg:w-80 lg:h-full sm:inset-x-0 sm:bottom-0 sm:h-1/2`}>
+                  <div
+                    className={`fixed z-40 transition-transform duration-300 ${
+                      showMenuPanel
+                        ? "translate-x-0 translate-y-0"
+                        : "-translate-x-full translate-y-full"
+                    } lg:inset-y-0 lg:left-0 lg:w-80 lg:h-full sm:inset-x-0 sm:bottom-0 sm:h-1/2`}
+                  >
                     <div className="w-full lg:w-80 h-full bg-white shadow-xl overflow-auto rounded-t-lg lg:rounded-none">
                       <div className="p-4 border-b flex items-center justify-between">
-                        <h3 id="menu-panel-title" className="text-lg font-semibold">Menu Items</h3>
+                        <h3
+                          id="menu-panel-title"
+                          className="text-lg font-semibold"
+                        >
+                          Menu Items
+                        </h3>
                         <div className="flex items-center space-x-2">
                           <Button
                             variant="ghost"
@@ -886,14 +1238,30 @@ export default function AdminDashboard() {
                             <Plus className="mr-2 h-4 w-4" />
                             Add Item
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setShowMenuPanel(false)} title="Close menu panel">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowMenuPanel(false)}
+                            title="Close menu panel"
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
                       </div>
 
-                      <div className="p-4" id="menu-panel" role="dialog" aria-modal="true" aria-labelledby="menu-panel-title" ref={panelRef} tabIndex={-1}>
-                        <p className="text-xs text-gray-500 mb-3">Tip: tap the <strong>Menu</strong> button to open this panel. On phones this opens as a bottom sheet.</p>
+                      <div
+                        className="p-4"
+                        id="menu-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="menu-panel-title"
+                        ref={panelRef}
+                        tabIndex={-1}
+                      >
+                        <p className="text-xs text-gray-500 mb-3">
+                          Tip: tap the <strong>Menu</strong> button to open this
+                          panel. On phones this opens as a bottom sheet.
+                        </p>
                         {/* Add Item Form */}
                         {showAddForm && (
                           <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 rounded-lg">
@@ -903,7 +1271,12 @@ export default function AdminDashboard() {
                                 <Input
                                   placeholder="e.g., Margherita Pizza"
                                   value={newItem.name}
-                                  onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
+                                  onChange={(e) =>
+                                    setNewItem((prev) => ({
+                                      ...prev,
+                                      name: e.target.value,
+                                    }))
+                                  }
                                 />
                               </div>
                               <div>
@@ -913,7 +1286,12 @@ export default function AdminDashboard() {
                                   step="0.01"
                                   placeholder="0.00"
                                   value={newItem.price}
-                                  onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
+                                  onChange={(e) =>
+                                    setNewItem((prev) => ({
+                                      ...prev,
+                                      price: e.target.value,
+                                    }))
+                                  }
                                 />
                               </div>
                               <div>
@@ -921,7 +1299,12 @@ export default function AdminDashboard() {
                                 <Input
                                   placeholder="Brief description of the item..."
                                   value={newItem.description}
-                                  onChange={(e) => setNewItem(prev => ({ ...prev, description: e.target.value }))}
+                                  onChange={(e) =>
+                                    setNewItem((prev) => ({
+                                      ...prev,
+                                      description: e.target.value,
+                                    }))
+                                  }
                                 />
                               </div>
                               <div>
@@ -934,23 +1317,49 @@ export default function AdminDashboard() {
                                     if (file) {
                                       const imageUrl = await uploadImage(file);
                                       if (imageUrl) {
-                                        setNewItem(prev => ({ ...prev, imageUrl }));
+                                        setNewItem((prev) => ({
+                                          ...prev,
+                                          imageUrl,
+                                        }));
                                       }
                                     }
                                   }}
                                   disabled={uploadingImage}
                                 />
-                                <p className="text-xs text-gray-500 mt-1">Accepted formats: JPG, PNG, WebP, GIF. Max size: 200KB</p>
-                                {uploadingImage && <p className="text-sm text-gray-500 mt-1">Uploading image...</p>}
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Accepted formats: JPG, PNG, WebP, GIF. Max
+                                  size: 200KB
+                                </p>
+                                {uploadingImage && (
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Uploading image...
+                                  </p>
+                                )}
                                 {newItem.imageUrl && (
                                   <div className="mt-2">
-                                    <img src={newItem.imageUrl} alt="Preview" className="w-16 h-16 rounded-lg object-cover" loading="lazy" />
+                                    <img
+                                      src={newItem.imageUrl}
+                                      alt="Preview"
+                                      className="w-16 h-16 rounded-lg object-cover"
+                                      loading="lazy"
+                                    />
                                   </div>
                                 )}
                               </div>
                               <div className="flex justify-end space-x-2 mt-2">
-                                <Button variant="outline" onClick={() => setShowAddForm(false)}>Cancel</Button>
-                                <Button onClick={addMenuItem} className="bg-emerald-600 hover:bg-emerald-700" disabled={uploadingImage}>{uploadingImage ? 'Uploading...' : 'Add Item'}</Button>
+                                <Button
+                                  variant="outline"
+                                  onClick={() => setShowAddForm(false)}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  onClick={addMenuItem}
+                                  className="bg-emerald-600 hover:bg-emerald-700"
+                                  disabled={uploadingImage}
+                                >
+                                  {uploadingImage ? "Uploading..." : "Add Item"}
+                                </Button>
                               </div>
                             </div>
                           </div>
@@ -959,24 +1368,66 @@ export default function AdminDashboard() {
                         {/* Menu Items List */}
                         <div className="space-y-3">
                           {menuItems.map((item) => (
-                            <div key={item.id} className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => setEditingItem(item)}>
+                            <div
+                              key={item.id}
+                              className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors cursor-pointer"
+                              onClick={() => setEditingItem(item)}
+                            >
                               <div className="flex items-center justify-between">
                                 <div className="flex-1">
                                   <div className="flex items-center space-x-3">
-                                    {item.imageUrl && <img src={item.imageUrl} alt={item.name} className="w-10 h-10 rounded-lg object-cover" loading="lazy" />}
+                                    {item.imageUrl && (
+                                      <img
+                                        src={item.imageUrl}
+                                        alt={item.name}
+                                        className="w-10 h-10 rounded-lg object-cover"
+                                        loading="lazy"
+                                      />
+                                    )}
                                     <div>
-                                      <h4 className="text-sm font-medium text-gray-900">{item.name}</h4>
-                                      <Badge variant={item.available ? 'default' : 'secondary'}>{item.available ? 'Available' : 'Unavailable'}</Badge>
+                                      <h4 className="text-sm font-medium text-gray-900">
+                                        {item.name}
+                                      </h4>
+                                      <Badge
+                                        variant={
+                                          item.available
+                                            ? "default"
+                                            : "secondary"
+                                        }
+                                      >
+                                        {item.available
+                                          ? "Available"
+                                          : "Unavailable"}
+                                      </Badge>
                                     </div>
                                   </div>
-                                  {item.description && <p className="text-xs text-gray-500 mt-1">{item.description}</p>}
+                                  {item.description && (
+                                    <p className="text-xs text-gray-500 mt-1">
+                                      {item.description}
+                                    </p>
+                                  )}
                                   <div className="flex items-center space-x-2 mt-2">
-                                    <span className="text-sm font-semibold">Rs{currency(Number(item.price))}</span>
-                                    <span className="text-xs text-gray-500">Added {new Date(item.createdAt || '').toLocaleDateString()}</span>
+                                    <span className="text-sm font-semibold">
+                                      Rs{currency(Number(item.price))}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      Added{" "}
+                                      {new Date(
+                                        item.createdAt || ""
+                                      ).toLocaleDateString()}
+                                    </span>
                                   </div>
                                 </div>
                                 <div className="ml-2">
-                                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); deleteMenuItem(item.id); }} title="Delete item">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      deleteMenuItem(item.id);
+                                    }}
+                                    title="Delete item"
+                                  >
                                     <Trash2 className="h-4 w-4 text-red-600" />
                                   </Button>
                                 </div>
@@ -988,29 +1439,95 @@ export default function AdminDashboard() {
                           {editingItem && (
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                               <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-                                <h3 className="text-lg font-semibold mb-4">Edit Menu Item</h3>
+                                <h3 className="text-lg font-semibold mb-4">
+                                  Edit Menu Item
+                                </h3>
                                 <div className="space-y-4">
                                   <div>
                                     <Label>Item Name</Label>
-                                    <Input value={editingItem.name} onChange={(e) => setEditingItem(prev => prev ? { ...prev, name: e.target.value } : null)} />
+                                    <Input
+                                      value={editingItem.name}
+                                      onChange={(e) =>
+                                        setEditingItem((prev) =>
+                                          prev
+                                            ? { ...prev, name: e.target.value }
+                                            : null
+                                        )
+                                      }
+                                    />
                                   </div>
                                   <div>
                                     <Label>Price (Rs)</Label>
-                                    <Input type="number" step="0.01" value={editingItem.price} onChange={(e) => setEditingItem(prev => prev ? { ...prev, price: e.target.value } : null)} />
+                                    <Input
+                                      type="number"
+                                      step="0.01"
+                                      value={editingItem.price}
+                                      onChange={(e) =>
+                                        setEditingItem((prev) =>
+                                          prev
+                                            ? { ...prev, price: e.target.value }
+                                            : null
+                                        )
+                                      }
+                                    />
                                   </div>
                                   <div>
                                     <Label>Description</Label>
-                                    <Input value={editingItem.description || ''} onChange={(e) => setEditingItem(prev => prev ? { ...prev, description: e.target.value } : null)} />
+                                    <Input
+                                      value={editingItem.description || ""}
+                                      onChange={(e) =>
+                                        setEditingItem((prev) =>
+                                          prev
+                                            ? {
+                                                ...prev,
+                                                description: e.target.value,
+                                              }
+                                            : null
+                                        )
+                                      }
+                                    />
                                   </div>
                                   <div>
                                     <Label className="flex items-center space-x-2">
-                                      <input type="checkbox" checked={editingItem.available ?? false} onChange={(e) => setEditingItem(prev => prev ? { ...prev, available: e.target.checked } : null)} />
+                                      <input
+                                        type="checkbox"
+                                        checked={editingItem.available ?? false}
+                                        onChange={(e) =>
+                                          setEditingItem((prev) =>
+                                            prev
+                                              ? {
+                                                  ...prev,
+                                                  available: e.target.checked,
+                                                }
+                                              : null
+                                          )
+                                        }
+                                      />
                                       <span>Available</span>
                                     </Label>
                                   </div>
                                   <div className="flex justify-end space-x-3 mt-6">
-                                    <Button variant="outline" onClick={() => setEditingItem(null)}>Cancel</Button>
-                                    <Button onClick={() => { if (editingItem) { updateMenuItem(editingItem.id, { name: editingItem.name, price: editingItem.price, description: editingItem.description, available: editingItem.available }); } }}>Save Changes</Button>
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => setEditingItem(null)}
+                                    >
+                                      Cancel
+                                    </Button>
+                                    <Button
+                                      onClick={() => {
+                                        if (editingItem) {
+                                          updateMenuItem(editingItem.id, {
+                                            name: editingItem.name,
+                                            price: editingItem.price,
+                                            description:
+                                              editingItem.description,
+                                            available: editingItem.available,
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      Save Changes
+                                    </Button>
                                   </div>
                                 </div>
                               </div>
