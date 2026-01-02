@@ -14,8 +14,7 @@ server/public
 .env.development.local
 .env.test.local
 .env.production.local
-
-# IDE and Editor files
+.env.local.example
 .idea/
 .vscode/
 *.swp

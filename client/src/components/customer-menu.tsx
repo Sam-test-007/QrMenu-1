@@ -2,9 +2,10 @@ import { useState, useEffect, useMemo } from "react";
 import { useParams } from "wouter";
 import { supabase, currency } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Minus, ShoppingCart, Leaf, Flame } from "lucide-react";
+import { Plus, Minus, ShoppingCart, Leaf, Flame, Search } from "lucide-react";
 import type { Restaurant, MenuItem } from "@shared/schema";
 
 interface MenuItemWithQuantity {
@@ -26,6 +27,7 @@ export default function CustomerMenu() {
   const { slug } = useParams();
   const [menu, setMenu] = useState<MenuData>({ name: "", items: [] });
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   
   // Extract table number from URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -87,6 +89,16 @@ export default function CustomerMenu() {
     menu.items.filter(item => item.quantity > 0),
     [menu.items]
   );
+
+  const filteredItems = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return menu.items;
+    return menu.items.filter(item => {
+      const name = (item.name || "").toLowerCase();
+      const desc = (item.description || "").toLowerCase();
+      return name.includes(q) || desc.includes(q);
+    });
+  }, [menu.items, searchQuery]);
     // Add this after the existing itemsInOrder useMemo
   const placeOrder = async () => {
     if (!itemsInOrder.length || !slug) return;
@@ -175,17 +187,41 @@ export default function CustomerMenu() {
         {/* Menu Categories */}
         <Card className="rounded-2xl shadow-lg mb-8">
           <CardHeader className="bg-primary-50 border-b border-primary-100">
-            <CardTitle>Our Menu</CardTitle>
-            <p className="text-sm text-gray-600 mt-1">Tap items to add to your order</p>
+            <div className="w-full">
+              <div className="flex items-center justify-between">
+                <CardTitle>Our Menu</CardTitle>
+              </div>
+              <p className="text-sm text-gray-600 mt-1">Tap items to add to your order</p>
+              <div className="mt-3">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                    <Search className="h-4 w-4" />
+                  </span>
+                  <Input
+                    placeholder="Search menu..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery((e.target as HTMLInputElement).value)}
+                    className="pl-10"
+                    data-testid="input-search-menu"
+                  />
+                </div>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {menu.items.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 Menu is currently empty or restaurant not found.
               </div>
+            ) : filteredItems.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">
+                No results for "{searchQuery}".
+              </div>
             ) : (
               <div className="divide-y divide-gray-200">
-                {menu.items.map((item, index) => (
+                {filteredItems.map((item) => {
+                  const originalIndex = menu.items.findIndex(i => i.id === item.id);
+                  return (
                   <div 
                     key={item.id} 
                     className="p-6 hover:bg-gray-50 transition-colors"
@@ -223,7 +259,7 @@ export default function CustomerMenu() {
                               variant="outline"
                               size="sm"
                               className="w-8 h-8 p-0 rounded-full"
-                              onClick={() => updateQuantity(index, item.quantity - 1)}
+                              onClick={() => updateQuantity(originalIndex, item.quantity - 1)}
                               data-testid={`button-decrease-${item.id}`}
                             >
                               <Minus className="h-4 w-4" />
@@ -235,7 +271,7 @@ export default function CustomerMenu() {
                               variant="outline"
                               size="sm"
                               className="w-8 h-8 p-0 rounded-full bg-primary-100 hover:bg-primary-200"
-                              onClick={() => updateQuantity(index, item.quantity + 1)}
+                              onClick={() => updateQuantity(originalIndex, item.quantity + 1)}
                               data-testid={`button-increase-${item.id}`}
                             >
                               <Plus className="h-4 w-4 text-primary-600" />
@@ -245,7 +281,8 @@ export default function CustomerMenu() {
                       </div>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )}
           </CardContent>
