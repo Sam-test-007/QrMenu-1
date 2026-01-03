@@ -51,6 +51,7 @@ export default function AdminDashboard() {
     useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [showAllRecent, setShowAllRecent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
   const [newItem, setNewItem] = useState({
@@ -1249,7 +1250,7 @@ export default function AdminDashboard() {
                                 order.status === "completed" ||
                                 order.status === "cancelled"
                             )
-                            .slice(0, 5)
+                            .slice(0, showAllRecent ? undefined : 4)
                             .map((order) => (
                               <div
                                 key={order.id}
@@ -1301,9 +1302,28 @@ export default function AdminDashboard() {
                                       </span>
                                     </div>
                                   ))}
+
+                                  {/* end order items */}
                                 </div>
                               </div>
                             ))}
+
+                          {/* Single Show more / less toggle below the recent orders list */}
+                          {orders.filter(
+                            (order) =>
+                              order.status === "completed" ||
+                              order.status === "cancelled"
+                          ).length > 4 && (
+                            <div className="text-center mt-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowAllRecent((s) => !s)}
+                              >
+                                {showAllRecent ? "Show less" : "Show more"}
+                              </Button>
+                            </div>
+                          )}
 
                           {orders.filter(
                             (order) =>
