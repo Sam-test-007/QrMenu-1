@@ -3,6 +3,7 @@ import { useParams } from "wouter";
 import { supabase, currency } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Minus, ShoppingCart, Leaf, Flame, Search } from "lucide-react";
@@ -32,6 +33,7 @@ export default function CustomerMenu() {
   const [restaurantImageUrl, setRestaurantImageUrl] = useState<string | null>(
     null
   );
+  const [suggestion, setSuggestion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Extract table number from URL query parameters
@@ -135,6 +137,8 @@ export default function CustomerMenu() {
         table_number: tableNumber,
         status: "pending",
         total: total,
+        suggestion:
+          suggestion && suggestion.trim().length ? suggestion.trim() : null,
         items: itemsInOrder.map((item) => ({
           id: item.id,
           name: item.name,
@@ -157,6 +161,7 @@ export default function CustomerMenu() {
         ...prev,
         items: prev.items.map((item) => ({ ...item, quantity: 0 })),
       }));
+      setSuggestion("");
 
       alert("Order placed successfully! Please wait for your server.");
     } catch (error: any) {
@@ -388,6 +393,19 @@ export default function CustomerMenu() {
                   >
                     Rs{total.toFixed(2)}
                   </span>
+                </div>
+
+                {/* Suggestion textbox (optional) */}
+                <div className="mb-4">
+                  <Label className="mb-2">Suggestion (optional)</Label>
+                  <textarea
+                    value={suggestion}
+                    onChange={(e) => setSuggestion(e.target.value)}
+                    placeholder="Any suggestions to improve?"
+                    className="w-full p-3 rounded-md border border-gray-200 text-sm"
+                    rows={3}
+                    data-testid="input-suggestion"
+                  />
                 </div>
 
                 {/* Replace the existing Place Order Button with: */}

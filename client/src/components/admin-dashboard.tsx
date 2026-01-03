@@ -42,6 +42,7 @@ interface Order {
     quantity: number;
   }>;
   created_at: string;
+  suggestion?: string | null;
 }
 
 export default function AdminDashboard() {
@@ -103,6 +104,8 @@ export default function AdminDashboard() {
   );
   const { toast } = useToast();
   const restImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
+  const [suggestionText, setSuggestionText] = useState<string | null>(null);
 
   // keep a small timer so the "today" count resets soon after midnight
   useEffect(() => {
@@ -1322,6 +1325,21 @@ export default function AdminDashboard() {
                                 key={order.id}
                                 className="p-4 border rounded-lg"
                               >
+                                <div className="flex justify-end mb-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSuggestionText(
+                                        order.suggestion ?? null
+                                      );
+                                      setSuggestionDialogOpen(true);
+                                    }}
+                                    title="View suggestion"
+                                  >
+                                    Review
+                                  </Button>
+                                </div>
                                 <div className="flex justify-between items-start mb-4">
                                   <div>
                                     <div className="flex items-center space-x-3">
@@ -1400,6 +1418,38 @@ export default function AdminDashboard() {
                               No completed orders
                             </div>
                           )}
+                          {/* Suggestion dialog */}
+                          <Dialog
+                            open={suggestionDialogOpen}
+                            onOpenChange={setSuggestionDialogOpen}
+                          >
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Customer Suggestion</DialogTitle>
+                              </DialogHeader>
+                              <div className="mt-2">
+                                {suggestionText ? (
+                                  <p className="whitespace-pre-wrap">
+                                    {suggestionText}
+                                  </p>
+                                ) : (
+                                  <p className="text-gray-500">
+                                    No suggestion provided.
+                                  </p>
+                                )}
+                                <div className="mt-4 text-right">
+                                  <Button
+                                    size="sm"
+                                    onClick={() =>
+                                      setSuggestionDialogOpen(false)
+                                    }
+                                  >
+                                    Close
+                                  </Button>
+                                </div>
+                              </div>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </CardContent>
                     </Card>
