@@ -186,9 +186,32 @@ export default function AdminDashboard() {
   }, [orders, tick]);
 
   // total sales sum across fetched orders
+  // helper to check if an order is from today
+  const isToday = (dateStr: string) => {
+    try {
+      const d = new Date(dateStr);
+      const now = new Date();
+      return (
+        d.getFullYear() === now.getFullYear() &&
+        d.getMonth() === now.getMonth() &&
+        d.getDate() === now.getDate()
+      );
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const todaysOrders = useMemo(
+    () => orders.filter((o) => isToday(o.created_at)),
+    [orders, tick]
+  );
+
+  // total sales for today (sum of completed orders only)
   const totalSales = useMemo(() => {
-    return orders.reduce((s, o) => s + Number(o.total || 0), 0);
-  }, [orders]);
+    return todaysOrders
+      .filter((o) => o.status === "completed")
+      .reduce((s, o) => s + Number(o.total || 0), 0);
+  }, [todaysOrders]);
 
   useEffect(() => {
     if (user) {
@@ -236,7 +259,11 @@ export default function AdminDashboard() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      setRestaurants(data || []);
+      const normalized = (data || []).map((r: any) => ({
+        ...r,
+        imageUrl: r.image_url ?? r.imageUrl ?? null,
+      }));
+      setRestaurants(normalized);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -956,7 +983,7 @@ export default function AdminDashboard() {
                             <span>
                               Total orders:{" "}
                               <strong className="text-gray-900">
-                                {orders.length}
+                                {todaysOrders.length}
                               </strong>
                             </span>
                           </div>
@@ -973,7 +1000,7 @@ export default function AdminDashboard() {
                             <span>
                               <strong className="text-gray-900">
                                 {
-                                  orders.filter(
+                                  todaysOrders.filter(
                                     (o) =>
                                       o.status !== "completed" &&
                                       o.status !== "cancelled"
@@ -1025,6 +1052,45 @@ export default function AdminDashboard() {
                                 </p>
                               </div>
                             )}
+                            {tourStep === 3 && (
+                              <div>
+                                <h4 className="font-semibold">Upload Images</h4>
+                                <p className="text-sm text-gray-600">
+                                  Upload restaurant and menu images using the
+                                  Upload buttons. Restaurant images appear in
+                                  the dashboard header and on the public menu.
+                                </p>
+                                <p className="text-xs text-gray-500 mt-2">
+                                  Tip: keep images under 200KB for best
+                                  performance.
+                                </p>
+                              </div>
+                            )}
+                            {tourStep === 4 && (
+                              <div>
+                                <h4 className="font-semibold">
+                                  QR Code & Public Menu
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Use the QR code generator to create a QR for
+                                  this restaurant. The "View Public Menu" link
+                                  opens the customer-facing menu (the same page
+                                  scanned from the QR).
+                                </p>
+                              </div>
+                            )}
+                            {tourStep === 5 && (
+                              <div>
+                                <h4 className="font-semibold">
+                                  Reports & Exports
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  Use the date picker to download orders for a
+                                  specific day as CSV. The compact stats show
+                                  today's orders and sales by default.
+                                </p>
+                              </div>
+                            )}
 
                             <div className="flex justify-between">
                               <div>
@@ -1048,7 +1114,7 @@ export default function AdminDashboard() {
                                 >
                                   Skip
                                 </Button>
-                                {tourStep < 2 ? (
+                                {tourStep < 5 ? (
                                   <Button
                                     onClick={() => setTourStep((s) => s + 1)}
                                   >
@@ -1119,7 +1185,7 @@ export default function AdminDashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          {orders
+                          {todaysOrders
                             .filter(
                               (order) =>
                                 order.status !== "completed" &&
@@ -1244,7 +1310,7 @@ export default function AdminDashboard() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-4">
-                          {orders
+                          {todaysOrders
                             .filter(
                               (order) =>
                                 order.status === "completed" ||
@@ -1309,7 +1375,7 @@ export default function AdminDashboard() {
                             ))}
 
                           {/* Single Show more / less toggle below the recent orders list */}
-                          {orders.filter(
+                          {todaysOrders.filter(
                             (order) =>
                               order.status === "completed" ||
                               order.status === "cancelled"
