@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS public.restaurants (
     owner_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
+    image_url TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

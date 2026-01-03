@@ -851,9 +851,9 @@ export default function AdminDashboard() {
                       <div className="mb-4 sm:mb-0">
                         <div className="flex items-center space-x-4">
                           <div className="relative">
-                            {selectedRestaurant.image_url ? (
+                            {selectedRestaurant.imageUrl ? (
                               <img
-                                src={selectedRestaurant.image_url}
+                                src={selectedRestaurant.imageUrl}
                                 alt={selectedRestaurant.name}
                                 className="w-20 h-20 rounded-lg object-cover border"
                               />
@@ -894,12 +894,12 @@ export default function AdminDashboard() {
                                     if (error) throw error;
 
                                     setSelectedRestaurant((prev) =>
-                                      prev ? { ...prev, image_url: url } : prev
+                                      prev ? { ...prev, imageUrl: url } : prev
                                     );
                                     setRestaurants((prev) =>
                                       prev.map((r) =>
                                         r.id === selectedRestaurant.id
-                                          ? { ...r, image_url: url }
+                                          ? { ...r, imageUrl: url }
                                           : r
                                       )
                                     );

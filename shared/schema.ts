@@ -14,6 +14,7 @@ export const restaurants = pgTable("restaurants", {
   ownerId: uuid("owner_id").references(() => profiles.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
+  imageUrl: text("image_url"),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
 
