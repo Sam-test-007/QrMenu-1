@@ -1279,9 +1279,18 @@ export default function AdminDashboard() {
                                     <Button
                                       size="sm"
                                       variant="outline"
-                                      onClick={() =>
-                                        updateOrderStatus(order.id, "cancelled")
-                                      }
+                                      onClick={() => {
+                                        if (
+                                          confirm(
+                                            "Are you sure you want to cancel this order?"
+                                          )
+                                        ) {
+                                          updateOrderStatus(
+                                            order.id,
+                                            "cancelled"
+                                          );
+                                        }
+                                      }}
                                       title="Cancel this order"
                                     >
                                       Cancel
@@ -1290,16 +1299,36 @@ export default function AdminDashboard() {
                                 )}
 
                                 {order.status === "preparing" && (
-                                  <Button
-                                    size="sm"
-                                    className="mt-4"
-                                    onClick={() =>
-                                      updateOrderStatus(order.id, "completed")
-                                    }
-                                    title="Mark order as completed"
-                                  >
-                                    Mark as Completed
-                                  </Button>
+                                  <div className="mt-4 flex space-x-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() =>
+                                        updateOrderStatus(order.id, "completed")
+                                      }
+                                      title="Mark order as completed"
+                                    >
+                                      Mark as Completed
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => {
+                                        if (
+                                          confirm(
+                                            "Are you sure you want to cancel this order?"
+                                          )
+                                        ) {
+                                          updateOrderStatus(
+                                            order.id,
+                                            "cancelled"
+                                          );
+                                        }
+                                      }}
+                                      title="Cancel this order"
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
                                 )}
                               </div>
                             ))}
