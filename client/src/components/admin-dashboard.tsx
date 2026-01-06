@@ -106,6 +106,22 @@ export default function AdminDashboard() {
   const restImageInputRef = useRef<HTMLInputElement | null>(null);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
   const [suggestionText, setSuggestionText] = useState<string | null>(null);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileName, setProfileName] = useState<string>(
+    user?.user_metadata?.full_name ?? ""
+  );
+  const [profilePhone, setProfilePhone] = useState<string>(
+    user?.user_metadata?.phone ?? ""
+  );
+  const [profileOther, setProfileOther] = useState<string>(
+    user?.user_metadata?.other ?? ""
+  );
+
+  useEffect(() => {
+    setProfileName(user?.user_metadata?.full_name ?? "");
+    setProfilePhone(user?.user_metadata?.phone ?? "");
+    setProfileOther(user?.user_metadata?.other ?? "");
+  }, [user]);
 
   // keep a small timer so the "today" count resets soon after midnight
   useEffect(() => {
@@ -651,6 +667,31 @@ export default function AdminDashboard() {
     }
   };
 
+  const updateUserProfile = async () => {
+    try {
+      // update user metadata
+      // using supabase auth updateUser (v2)
+      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+      // @ts-ignore
+      const { data, error } = await supabase.auth.updateUser({
+        data: {
+          full_name: profileName,
+          phone: profilePhone,
+          other: profileOther,
+        },
+      });
+      if (error) throw error;
+      toast({ title: "Success", description: "Profile updated." });
+      setProfileDialogOpen(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const updateMenuItem = async (
     itemId: string,
     updatedData: Partial<MenuItem>
@@ -709,16 +750,23 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
-                  <User className="text-gray-600 h-4 w-4" />
-                </div>
-                <span
-                  className="text-sm text-gray-700"
-                  data-testid="text-user-email"
+              <div>
+                <button
+                  className="flex items-center space-x-2 focus:outline-none"
+                  onClick={() => setProfileDialogOpen(true)}
+                  aria-haspopup="dialog"
+                  title="Open profile"
                 >
-                  {user?.email}
-                </span>
+                  <div className="h-8 w-8 bg-gray-200 rounded-full flex items-center justify-center">
+                    <User className="text-gray-600 h-4 w-4" />
+                  </div>
+                  <span
+                    className="text-sm text-gray-700"
+                    data-testid="text-user-email"
+                  >
+                    {user?.email}
+                  </span>
+                </button>
               </div>
               <div className="flex items-center space-x-2">
                 <Button
@@ -742,6 +790,58 @@ export default function AdminDashboard() {
           </div>
         </div>
       </nav>
+
+      {/* Profile Dialog */}
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Profile</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div>
+              <Label>Name</Label>
+              <Input
+                value={profileName}
+                onChange={(e) => setProfileName(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Phone</Label>
+              <Input
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Other</Label>
+              <Input
+                value={profileOther}
+                onChange={(e) => setProfileOther(e.target.value)}
+              />
+            </div>
+
+            <div className="flex justify-between items-center mt-4">
+              <div className="space-x-2">
+                <a href="mailto:sales@qrmenu.example?subject=Contact%20Sales%20-%20QR%20Menu">
+                  <Button variant="ghost">Contact Sales</Button>
+                </a>
+                <a href="mailto:bugs@qrmenu.example?subject=Bug%20Report%20-%20QR%20Menu">
+                  <Button variant="ghost">Report Bug</Button>
+                </a>
+              </div>
+              <div className="space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setProfileDialogOpen(false)}
+                >
+                  Close
+                </Button>
+                <Button onClick={updateUserProfile}>Save</Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
