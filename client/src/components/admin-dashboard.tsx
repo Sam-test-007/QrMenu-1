@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import {
   Dialog,
   DialogContent,
@@ -27,6 +28,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import QRCodeGenerator from "./qr-code-generator";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
 
@@ -52,6 +54,10 @@ export default function AdminDashboard() {
     useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [olderPage, setOlderPage] = useState(0);
+  const pageSize = 20;
+  const [hasMoreOlder, setHasMoreOlder] = useState(true);
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [showAllRecent, setShowAllRecent] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newRestaurant, setNewRestaurant] = useState({ name: "", slug: "" });
@@ -80,6 +86,7 @@ export default function AdminDashboard() {
   // accessibility refs for menu panel focus management
   const panelRef = useRef<HTMLDivElement | null>(null);
   const prevFocusedRef = useRef<HTMLElement | null>(null);
+  const ordersReloadDebounceRef = useRef<number | null>(null);
 
   useEffect(() => {
     try {
@@ -106,6 +113,13 @@ export default function AdminDashboard() {
   const restImageInputRef = useRef<HTMLInputElement | null>(null);
   const [suggestionDialogOpen, setSuggestionDialogOpen] = useState(false);
   const [suggestionText, setSuggestionText] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmPayload, setConfirmPayload] = useState<{
+    title?: string;
+    description?: string;
+    confirmLabel?: string;
+    onConfirm?: () => void | Promise<void>;
+  } | null>(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [profileName, setProfileName] = useState<string>(
     user?.user_metadata?.full_name ?? ""
@@ -255,7 +269,14 @@ export default function AdminDashboard() {
             filter: `restaurant_id=eq.${selectedRestaurant.id}`,
           },
           () => {
-            loadOrders();
+            // debounce reloads triggered by realtime events to avoid rapid full reloads
+            if (ordersReloadDebounceRef.current) {
+              window.clearTimeout(ordersReloadDebounceRef.current);
+            }
+            ordersReloadDebounceRef.current = window.setTimeout(() => {
+              loadOrders();
+              ordersReloadDebounceRef.current = null;
+            }, 800);
           }
         )
         .subscribe();
@@ -396,22 +417,74 @@ export default function AdminDashboard() {
 
   const loadOrders = async () => {
     if (!selectedRestaurant) return;
-
     try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("restaurant_id", selectedRestaurant.id)
-        .order("created_at", { ascending: false });
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const startIso = startOfDay.toISOString();
 
-      if (error) throw error;
-      setOrders(data || []);
+      // Load today's orders first
+      const [
+        { data: todayData, error: todayErr },
+        { data: olderData, error: olderErr },
+      ] = await Promise.all([
+        supabase
+          .from("orders")
+          .select("*")
+          .eq("restaurant_id", selectedRestaurant.id)
+          .gte("created_at", startIso)
+          .order("created_at", { ascending: false }),
+        // load first page of older orders (created before today)
+        supabase
+          .from("orders")
+          .select("*")
+          .eq("restaurant_id", selectedRestaurant.id)
+          .lt("created_at", startIso)
+          .order("created_at", { ascending: false })
+          .range(0, pageSize - 1),
+      ]);
+
+      if (todayErr || olderErr) throw todayErr || olderErr;
+
+      setOrders([...(todayData || []), ...(olderData || [])]);
+      setOlderPage(1);
+      setHasMoreOlder((olderData || []).length === pageSize);
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Failed to load orders",
         variant: "destructive",
       });
+    }
+  };
+
+  const loadMoreOlder = async () => {
+    if (!selectedRestaurant || !hasMoreOlder || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      const startIso = startOfDay.toISOString();
+      const start = olderPage * pageSize;
+      const end = (olderPage + 1) * pageSize - 1;
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*")
+        .eq("restaurant_id", selectedRestaurant.id)
+        .lt("created_at", startIso)
+        .order("created_at", { ascending: false })
+        .range(start, end);
+      if (error) throw error;
+      setOrders((prev) => [...prev, ...(data || [])]);
+      setOlderPage((p) => p + 1);
+      setHasMoreOlder((data || []).length === pageSize);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load older orders",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingOlder(false);
     }
   };
 
@@ -602,9 +675,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const deleteMenuItem = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return;
-
+  const deleteMenuItemConfirmed = async (id: string) => {
     try {
       const { error } = await supabase.from("menu_items").delete().eq("id", id);
 
@@ -623,12 +694,25 @@ export default function AdminDashboard() {
     }
   };
 
+  const deleteMenuItem = (id: string) => {
+    setConfirmPayload({
+      title: "Delete menu item",
+      description: "Are you sure you want to delete this item?",
+      confirmLabel: "Delete",
+      onConfirm: async () => await deleteMenuItemConfirmed(id),
+    });
+    setConfirmOpen(true);
+  };
+
   const updateOrderStatus = async (
     orderId: string,
-    status: Order["status"]
+    status: Order["status"],
+    showUndo: boolean = true
   ) => {
     try {
       const existingOrder = orders.find((o) => o.id === orderId);
+      const prevStatus = existingOrder?.status;
+
       const { error } = await supabase
         .from("orders")
         .update({ status })
@@ -652,12 +736,38 @@ export default function AdminDashboard() {
         }
       }
 
-      loadOrders(); // Reload orders after update
+      // Update local orders state optimistically instead of reloading entire list
+      setOrders((prev) =>
+        prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+      );
 
-      toast({
-        title: "Success",
-        description: "Order status updated",
-      });
+      // show success toast with optional Undo action
+      if (showUndo && prevStatus && prevStatus !== status) {
+        const t = toast({
+          title: "Order updated",
+          description: `Marked ${status}.`,
+          action: (
+            <ToastAction
+              altText="Undo"
+              onClick={async () => {
+                try {
+                  t.dismiss();
+                  await updateOrderStatus(orderId, prevStatus, false);
+                } catch (e) {
+                  // ignore
+                }
+              }}
+            >
+              Undo
+            </ToastAction>
+          ),
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Order status updated",
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -790,6 +900,22 @@ export default function AdminDashboard() {
           </div>
         </div>
       </nav>
+
+      {/* Confirm Dialog (reusable) */}
+      {confirmPayload && (
+        <ConfirmDialog
+          open={confirmOpen}
+          onOpenChange={(v) => setConfirmOpen(v)}
+          title={confirmPayload.title}
+          description={confirmPayload.description}
+          confirmLabel={confirmPayload.confirmLabel}
+          onConfirm={async () => {
+            if (confirmPayload?.onConfirm) {
+              await confirmPayload.onConfirm();
+            }
+          }}
+        />
+      )}
 
       {/* Profile Dialog */}
       <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
@@ -1380,16 +1506,18 @@ export default function AdminDashboard() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => {
-                                        if (
-                                          confirm(
-                                            "Are you sure you want to cancel this order?"
-                                          )
-                                        ) {
-                                          updateOrderStatus(
-                                            order.id,
-                                            "cancelled"
-                                          );
-                                        }
+                                        setConfirmPayload({
+                                          title: "Cancel order",
+                                          description:
+                                            "Are you sure you want to cancel this order?",
+                                          confirmLabel: "Cancel Order",
+                                          onConfirm: async () =>
+                                            await updateOrderStatus(
+                                              order.id,
+                                              "cancelled"
+                                            ),
+                                        });
+                                        setConfirmOpen(true);
                                       }}
                                       title="Cancel this order"
                                     >
@@ -1413,16 +1541,18 @@ export default function AdminDashboard() {
                                       size="sm"
                                       variant="outline"
                                       onClick={() => {
-                                        if (
-                                          confirm(
-                                            "Are you sure you want to cancel this order?"
-                                          )
-                                        ) {
-                                          updateOrderStatus(
-                                            order.id,
-                                            "cancelled"
-                                          );
-                                        }
+                                        setConfirmPayload({
+                                          title: "Cancel order",
+                                          description:
+                                            "Are you sure you want to cancel this order?",
+                                          confirmLabel: "Cancel Order",
+                                          onConfirm: async () =>
+                                            await updateOrderStatus(
+                                              order.id,
+                                              "cancelled"
+                                            ),
+                                        });
+                                        setConfirmOpen(true);
                                       }}
                                       title="Cancel this order"
                                     >
@@ -1584,6 +1714,19 @@ export default function AdminDashboard() {
                     </Card>
                   </section>
                 </div>
+
+                {hasMoreOlder && (
+                  <div className="text-center mt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadMoreOlder}
+                      disabled={loadingOlder}
+                    >
+                      {loadingOlder ? "Loading..." : "Load older orders"}
+                    </Button>
+                  </div>
+                )}
 
                 {/* Menu Panel Toggle + Panel (moved to left side) */}
                 {/* Toggle button */}

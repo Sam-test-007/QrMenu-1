@@ -109,7 +109,7 @@ export default function CustomerMenu() {
   );
 
   const filteredItems = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = (searchQuery ?? "").trim().toLowerCase();
     if (!q) return menu.items;
     return menu.items.filter((item) => {
       const name = (item.name || "").toLowerCase();
@@ -138,7 +138,9 @@ export default function CustomerMenu() {
         status: "pending",
         total: total,
         suggestion:
-          suggestion && suggestion.trim().length ? suggestion.trim() : null,
+          typeof suggestion === "string" && suggestion.trim().length
+            ? suggestion.trim()
+            : null,
         items: itemsInOrder.map((item) => ({
           id: item.id,
           name: item.name,
