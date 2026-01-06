@@ -1199,6 +1199,21 @@ export default function AdminDashboard() {
                                 key={order.id}
                                 className="p-4 border rounded-lg"
                               >
+                                <div className="flex justify-end mb-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setSuggestionText(
+                                        order.suggestion ?? null
+                                      );
+                                      setSuggestionDialogOpen(true);
+                                    }}
+                                    title="View suggestion"
+                                  >
+                                    Review
+                                  </Button>
+                                </div>
                                 <div className="flex justify-between items-start mb-4">
                                   <div>
                                     <div className="flex items-center space-x-3">
@@ -1325,21 +1340,6 @@ export default function AdminDashboard() {
                                 key={order.id}
                                 className="p-4 border rounded-lg"
                               >
-                                <div className="flex justify-end mb-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                      setSuggestionText(
-                                        order.suggestion ?? null
-                                      );
-                                      setSuggestionDialogOpen(true);
-                                    }}
-                                    title="View suggestion"
-                                  >
-                                    Review
-                                  </Button>
-                                </div>
                                 <div className="flex justify-between items-start mb-4">
                                   <div>
                                     <div className="flex items-center space-x-3">
