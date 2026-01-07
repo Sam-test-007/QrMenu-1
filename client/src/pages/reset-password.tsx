@@ -30,7 +30,7 @@ export default function ResetPassword() {
         toast({
           title: "Configuration error",
           description:
-            "Supabase client is not configured (missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY). Set env vars and restart the dev server.",
+            "Supabase client is not configured . Set env vars and restart the dev server.",
           variant: "destructive",
         });
         return;
