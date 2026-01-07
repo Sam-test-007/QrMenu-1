@@ -28,13 +28,13 @@ export default function AuthForm() {
 
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp({ 
-        email, 
+      const { data, error } = await supabase.auth.signUp({
+        email,
         password,
       });
-      
+
       if (error) throw error;
-      
+
       // Create profile for the new user if auto-confirmation is enabled
       if (data.user && !data.user.email_confirmed_at) {
         toast({
@@ -45,16 +45,17 @@ export default function AuthForm() {
         // If auto-confirmation is enabled, create profile immediately
         const { error: profileError } = await supabase
           .from("profiles")
-          .upsert({ 
+          .upsert({
             id: data.user.id,
-            full_name: data.user.email || data.user.user_metadata?.full_name || null
+            full_name:
+              data.user.email || data.user.user_metadata?.full_name || null,
           })
           .select();
-        
+
         if (profileError) {
           console.warn("Profile creation warning:", profileError);
         }
-        
+
         navigate("/dashboard");
       }
     } catch (error: any) {
@@ -84,24 +85,25 @@ export default function AuthForm() {
         email,
         password,
       });
-      
+
       if (error) throw error;
-      
+
       // Create profile if it doesn't exist
       if (data.user) {
         const { error: profileError } = await supabase
           .from("profiles")
-          .upsert({ 
+          .upsert({
             id: data.user.id,
-            full_name: data.user.email || data.user.user_metadata?.full_name || null
+            full_name:
+              data.user.email || data.user.user_metadata?.full_name || null,
           })
           .select();
-        
+
         if (profileError) {
           console.warn("Profile creation warning:", profileError);
         }
       }
-      
+
       navigate("/dashboard");
     } catch (error: any) {
       toast({
@@ -114,6 +116,39 @@ export default function AuthForm() {
     }
   }
 
+  async function handleResetPassword() {
+    if (!email) {
+      toast({
+        title: "Error",
+        description: "Please enter your email address to reset your password",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const redirectTo = `${window.location.origin}/reset-password`;
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo,
+      });
+      if (error) throw error;
+
+      toast({
+        title: "Check your inbox",
+        description:
+          "If an account exists for that email, a password reset link has been sent.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Unable to send reset link",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
   return (
     <div className="min-h-screen flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-primary-50 to-white">
       <div className="max-w-md w-full space-y-8">
@@ -121,8 +156,12 @@ export default function AuthForm() {
           <div className="mx-auto h-16 w-16 bg-primary-600 rounded-xl flex items-center justify-center mb-6">
             <QrCode className="text-white text-2xl h-8 w-8" />
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">QR Menu SaaS</h2>
-          <p className="text-gray-600">Manage your restaurant menus with ease</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+            QR Menu SaaS
+          </h2>
+          <p className="text-gray-600">
+            Manage your restaurant menus with ease
+          </p>
         </div>
 
         <Card className="shadow-xl border-gray-100">
@@ -132,10 +171,14 @@ export default function AuthForm() {
           <CardContent>
             <Tabs defaultValue="signin" className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="signin" data-testid="tab-signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup" data-testid="tab-signup">Sign Up</TabsTrigger>
+                <TabsTrigger value="signin" data-testid="tab-signin">
+                  Sign In
+                </TabsTrigger>
+                <TabsTrigger value="signup" data-testid="tab-signup">
+                  Sign Up
+                </TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="signin" className="space-y-4">
                 <div>
                   <Label htmlFor="signin-email">Email address</Label>
@@ -169,14 +212,25 @@ export default function AuthForm() {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handleSignIn} 
-                  className="w-full" 
+                <Button
+                  onClick={handleSignIn}
+                  className="w-full"
                   disabled={loading}
                   data-testid="button-signin"
                 >
                   {loading ? "Signing in..." : "Sign In"}
                 </Button>
+                <div className="text-center mt-2">
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    disabled={loading}
+                    className="text-sm text-primary-600 hover:underline"
+                    data-testid="button-forgot-password"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
@@ -212,9 +266,9 @@ export default function AuthForm() {
                   </div>
                 </div>
 
-                <Button 
-                  onClick={handleSignUp} 
-                  className="w-full" 
+                <Button
+                  onClick={handleSignUp}
+                  className="w-full"
                   disabled={loading}
                   data-testid="button-signup"
                 >
