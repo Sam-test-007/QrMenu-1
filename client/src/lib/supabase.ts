@@ -9,6 +9,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Expose a flag so UI can show a helpful error if env vars are missing at runtime
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
 export function currency(n: number) {
   return Number(n).toLocaleString(undefined, { 
     minimumFractionDigits: 2, 

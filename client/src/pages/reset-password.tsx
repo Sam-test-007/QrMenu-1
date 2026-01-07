@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { supabase } from "@/lib/supabase";
+import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -26,15 +26,22 @@ export default function ResetPassword() {
     const refresh_token = params.get("refresh_token");
 
     if (type === "recovery" && access_token) {
+      if (!isSupabaseConfigured) {
+        toast({
+          title: "Configuration error",
+          description:
+            "Supabase client is not configured (missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY). Set env vars and restart the dev server.",
+          variant: "destructive",
+        });
+        return;
+      }
       (async () => {
         setLoading(true);
         try {
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-          // @ts-ignore
-          const { data, error } = await supabase.auth.setSession({
-            access_token,
-            refresh_token: refresh_token || undefined,
-          });
+          const payload: any = refresh_token
+            ? { access_token, refresh_token }
+            : { access_token };
+          const { data, error } = await supabase.auth.setSession(payload);
           if (error) throw error;
 
           // remove tokens from URL for security
