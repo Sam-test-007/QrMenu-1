@@ -66,6 +66,7 @@ export default function AdminDashboard() {
     price: "",
     description: "",
     imageUrl: "",
+    category: "",
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [uploadingRestImage, setUploadingRestImage] = useState(false);
@@ -643,6 +644,15 @@ export default function AdminDashboard() {
       return;
     }
 
+    if (!newItem.category || !newItem.category.trim()) {
+      toast({
+        title: "Error",
+        description: "Category is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from("menu_items")
@@ -653,6 +663,7 @@ export default function AdminDashboard() {
             price: newItem.price,
             description: newItem.description || null,
             image_url: newItem.imageUrl || null,
+            category: newItem.category,
           },
         ])
         .select()
@@ -660,7 +671,13 @@ export default function AdminDashboard() {
 
       if (error) throw error;
       setMenuItems((prev) => [...prev, data]);
-      setNewItem({ name: "", price: "", description: "", imageUrl: "" });
+      setNewItem({
+        name: "",
+        price: "",
+        description: "",
+        imageUrl: "",
+        category: "",
+      });
       setShowAddForm(false);
       toast({
         title: "Success",
@@ -1850,6 +1867,19 @@ export default function AdminDashboard() {
                                 />
                               </div>
                               <div>
+                                <Label>Category </Label>
+                                <Input
+                                  placeholder="e.g., Food, Beverages, Desserts"
+                                  value={newItem.category}
+                                  onChange={(e) =>
+                                    setNewItem((prev) => ({
+                                      ...prev,
+                                      category: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </div>
+                              <div>
                                 <Label>Image (Optional)</Label>
                                 <Input
                                   type="file"
@@ -2030,6 +2060,22 @@ export default function AdminDashboard() {
                                     />
                                   </div>
                                   <div>
+                                    <Label>Category</Label>
+                                    <Input
+                                      value={editingItem.category || ""}
+                                      onChange={(e) =>
+                                        setEditingItem((prev) =>
+                                          prev
+                                            ? {
+                                                ...prev,
+                                                category: e.target.value,
+                                              }
+                                            : null
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                  <div>
                                     <Label className="flex items-center space-x-2">
                                       <input
                                         type="checkbox"
@@ -2058,12 +2104,25 @@ export default function AdminDashboard() {
                                     <Button
                                       onClick={() => {
                                         if (editingItem) {
+                                          if (
+                                            !editingItem.category ||
+                                            !editingItem.category.trim()
+                                          ) {
+                                            toast({
+                                              title: "Error",
+                                              description:
+                                                "Category is required",
+                                              variant: "destructive",
+                                            });
+                                            return;
+                                          }
                                           updateMenuItem(editingItem.id, {
                                             name: editingItem.name,
                                             price: editingItem.price,
                                             description:
                                               editingItem.description,
                                             available: editingItem.available,
+                                            category: editingItem.category,
                                           });
                                         }
                                       }}

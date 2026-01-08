@@ -16,6 +16,7 @@ interface MenuItemWithQuantity {
   available: boolean | null;
   description: string | null;
   imageUrl: string | null;
+  category?: string | null;
   quantity: number;
 }
 
@@ -35,6 +36,7 @@ export default function CustomerMenu() {
   );
   const [suggestion, setSuggestion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   // Extract table number from URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -63,21 +65,29 @@ export default function CustomerMenu() {
         );
         const { data: items, error: itemsError } = await supabase
           .from("menu_items")
-          .select("id,name,price,available,description,image_url")
+          .select("id,name,price,available,description,image_url,category")
           .eq("restaurant_id", restaurant.id)
           .eq("available", true)
           .order("created_at", { ascending: true });
 
         if (itemsError) throw itemsError;
 
+        const mapped = (items || []).map((item) => ({
+          ...item,
+          imageUrl: item.image_url,
+          category: (item as any).category ?? null,
+          quantity: 0,
+        }));
+
         setMenu({
           name: restaurant.name,
-          items: (items || []).map((item) => ({
-            ...item,
-            imageUrl: item.image_url,
-            quantity: 0,
-          })),
+          items: mapped,
         });
+
+        const cats = Array.from(
+          new Set(mapped.map((i) => i.category || "Uncategorized"))
+        );
+        setSelectedCategory(cats.length ? cats[0] : null);
       }
     } catch (error) {
       console.error("Error loading menu:", error);
@@ -110,13 +120,21 @@ export default function CustomerMenu() {
 
   const filteredItems = useMemo(() => {
     const q = (searchQuery ?? "").trim().toLowerCase();
-    if (!q) return menu.items;
-    return menu.items.filter((item) => {
-      const name = (item.name || "").toLowerCase();
-      const desc = (item.description || "").toLowerCase();
-      return name.includes(q) || desc.includes(q);
-    });
-  }, [menu.items, searchQuery]);
+    const bySearch = !q
+      ? menu.items
+      : menu.items.filter((item) => {
+          const name = (item.name || "").toLowerCase();
+          const desc = (item.description || "").toLowerCase();
+          return name.includes(q) || desc.includes(q);
+        });
+
+    if (!selectedCategory) return bySearch;
+    return bySearch.filter(
+      (item) =>
+        (item as any).category === selectedCategory ||
+        ((item as any).category == null && selectedCategory === "Uncategorized")
+    );
+  }, [menu.items, searchQuery, selectedCategory]);
   // Add this after the existing itemsInOrder useMemo
   const placeOrder = async () => {
     if (!itemsInOrder.length || !slug) return;
@@ -179,6 +197,10 @@ export default function CustomerMenu() {
       </div>
     );
   }
+
+  const categories = Array.from(
+    new Set(menu.items.map((i) => (i as any).category || "Uncategorized"))
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -247,6 +269,25 @@ export default function CustomerMenu() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
+            {categories.length > 0 && (
+              <div className="px-4 py-3 overflow-x-auto">
+                <div className="flex space-x-3">
+                  {categories.map((cat) => (
+                    <button
+                      key={cat}
+                      onClick={() => setSelectedCategory(cat)}
+                      className={`px-3 py-1 rounded-full text-sm border transition-colors whitespace-nowrap ${
+                        selectedCategory === cat
+                          ? "bg-gray-900 text-white border-gray-900"
+                          : "bg-white text-gray-700 border-gray-200"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {menu.items.length === 0 ? (
               <div className="p-6 text-center text-gray-500">
                 Menu is currently empty or restaurant not found.

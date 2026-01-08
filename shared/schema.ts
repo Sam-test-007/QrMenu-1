@@ -24,6 +24,7 @@ export const menuItems = pgTable("menu_items", {
   name: text("name").notNull(),
   description: text("description"),
   price: numeric("price").notNull(),
+  category: text("category").notNull(),
   imageUrl: text("image_url"),
   available: boolean("available").default(true),
   createdAt: timestamp("created_at").default(sql`now()`),
