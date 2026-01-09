@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation } from "wouter";
+import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +14,10 @@ export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const captchaRef = useRef<HCaptcha>(null);
 
   async function handleSignUp() {
     if (!email || !password) {
@@ -26,11 +29,23 @@ export default function AuthForm() {
       return;
     }
 
+    if (!captchaToken) {
+      toast({
+        title: "Error",
+        description: "Please complete the CAPTCHA",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          captchaToken,
+        },
       });
 
       if (error) throw error;
@@ -64,6 +79,9 @@ export default function AuthForm() {
         description: error.message,
         variant: "destructive",
       });
+      // Reset captcha on error
+      captchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -79,11 +97,23 @@ export default function AuthForm() {
       return;
     }
 
+    if (!captchaToken) {
+      toast({
+        title: "Error",
+        description: "Please complete the CAPTCHA",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: {
+          captchaToken,
+        },
       });
 
       if (error) throw error;
@@ -111,6 +141,9 @@ export default function AuthForm() {
         description: error.message,
         variant: "destructive",
       });
+      // Reset captcha on error
+      captchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -126,11 +159,21 @@ export default function AuthForm() {
       return;
     }
 
+    if (!captchaToken) {
+      toast({
+        title: "Error",
+        description: "Please complete the CAPTCHA",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const redirectTo = `${window.location.origin}/reset-password`;
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
+        captchaToken,
       });
       if (error) throw error;
 
@@ -145,6 +188,9 @@ export default function AuthForm() {
         description: error.message || "Unable to send reset link",
         variant: "destructive",
       });
+      // Reset captcha on error
+      captchaRef.current?.resetCaptcha();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -212,6 +258,23 @@ export default function AuthForm() {
                   </div>
                 </div>
 
+                <div className="flex justify-center py-4">
+                  <HCaptcha
+                    ref={captchaRef}
+                    sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY || ""}
+                    onVerify={(token) => setCaptchaToken(token)}
+                    onError={() => {
+                      setCaptchaToken(null);
+                      toast({
+                        title: "CAPTCHA Error",
+                        description:
+                          "Failed to verify CAPTCHA. Please try again.",
+                        variant: "destructive",
+                      });
+                    }}
+                  />
+                </div>
+
                 <Button
                   onClick={handleSignIn}
                   className="w-full"
@@ -264,6 +327,23 @@ export default function AuthForm() {
                       data-testid="input-password-signup"
                     />
                   </div>
+                </div>
+
+                <div className="flex justify-center py-4">
+                  <HCaptcha
+                    ref={captchaRef}
+                    sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY || ""}
+                    onVerify={(token) => setCaptchaToken(token)}
+                    onError={() => {
+                      setCaptchaToken(null);
+                      toast({
+                        title: "CAPTCHA Error",
+                        description:
+                          "Failed to verify CAPTCHA. Please try again.",
+                        variant: "destructive",
+                      });
+                    }}
+                  />
                 </div>
 
                 <Button
