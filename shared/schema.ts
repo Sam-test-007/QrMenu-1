@@ -6,6 +6,7 @@ import { z } from "zod";
 export const profiles = pgTable("profiles", {
   id: uuid("id").primaryKey(),
   fullName: text("full_name"),
+  phoneNumber: text("phone_number"),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
 

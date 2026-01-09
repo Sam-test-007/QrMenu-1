@@ -941,28 +941,6 @@ export default function AdminDashboard() {
             <DialogTitle>Profile</DialogTitle>
           </DialogHeader>
           <div className="grid gap-3">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Phone</Label>
-              <Input
-                value={profilePhone}
-                onChange={(e) => setProfilePhone(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label>Other</Label>
-              <Input
-                value={profileOther}
-                onChange={(e) => setProfileOther(e.target.value)}
-              />
-            </div>
-
             <div className="flex justify-between items-center mt-4">
               <div className="space-x-2">
                 <a href="mailto:sales@qrmenu.example?subject=Contact%20Sales%20-%20QR%20Menu">
