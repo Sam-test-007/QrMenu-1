@@ -446,7 +446,7 @@ export default function CustomerMenu() {
                     onChange={(e) => setSuggestion(e.target.value)}
                     placeholder="Any suggestions to improve?"
                     className="w-full p-3 rounded-md border border-gray-200 text-sm"
-                    rows={3}
+                    rows={1}
                     data-testid="input-suggestion"
                   />
                 </div>

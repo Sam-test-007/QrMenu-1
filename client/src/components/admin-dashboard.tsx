@@ -310,7 +310,7 @@ export default function AdminDashboard() {
       try {
         if (normalized.length > 0 && !selectedRestaurant) {
           setSelectedRestaurant(normalized[0]);
-          setShowMenuPanel(true);
+          setShowMenuPanel(false);
         }
       } catch (e) {
         // ignore
