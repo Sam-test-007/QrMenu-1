@@ -237,7 +237,12 @@ export default function CustomerMenu() {
               </Badge>
             </div>
           )}
-          <p className="text-gray-600">Authentic cuisine made with love</p>
+          <p className="text-gray-600">Welcome in Our Restaurant</p>
+          <p className="text-gray-600">
+            <a href="https://">Facebook🍳</a>
+            <a href="https://">Instagram📸</a>
+            <a href="https://">Twitter🐦</a>
+          </p>
         </div>
 
         {/* Menu Categories */}

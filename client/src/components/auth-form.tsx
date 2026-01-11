@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, Mail, Lock } from "lucide-react";
+import { QrCode, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 export default function AuthForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const captchaRef = useRef<HCaptcha>(null);
@@ -256,14 +257,28 @@ export default function AuthForm() {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="signin-password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         autoComplete="current-password"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         data-testid="input-password"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                        className="absolute right-3 top-3 h-6 w-6 text-gray-400 flex items-center justify-center"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
@@ -338,14 +353,28 @@ export default function AuthForm() {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="signup-password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         placeholder="Enter your password"
                         autoComplete="new-password"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         data-testid="input-password-signup"
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((s) => !s)}
+                        aria-label={
+                          showPassword ? "Hide password" : "Show password"
+                        }
+                        className="absolute right-3 top-3 h-6 w-6 text-gray-400 flex items-center justify-center"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </button>
                     </div>
                   </div>
 
