@@ -305,6 +305,16 @@ export default function AdminDashboard() {
         imageUrl: r.image_url ?? r.imageUrl ?? null,
       }));
       setRestaurants(normalized);
+      // If the admin has restaurants, auto-select the first one so they land
+      // directly in the management view without clicking "Manage".
+      try {
+        if (normalized.length > 0 && !selectedRestaurant) {
+          setSelectedRestaurant(normalized[0]);
+          setShowMenuPanel(true);
+        }
+      } catch (e) {
+        // ignore
+      }
     } catch (error: any) {
       toast({
         title: "Error",

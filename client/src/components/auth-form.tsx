@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 import { supabase } from "@/lib/supabase";
@@ -226,63 +226,74 @@ export default function AuthForm() {
               </TabsList>
 
               <TabsContent value="signin" className="space-y-4">
-                <div>
-                  <Label htmlFor="signin-email">Email address</Label>
-                  <div className="relative mt-2">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signin-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="pl-10"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      data-testid="input-email"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="signin-password">Password</Label>
-                  <div className="relative mt-2">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signin-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="pl-10"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      data-testid="input-password"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-center py-4">
-                  <HCaptcha
-                    ref={captchaRef}
-                    sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY || ""}
-                    onVerify={(token) => setCaptchaToken(token)}
-                    onError={() => {
-                      setCaptchaToken(null);
-                      toast({
-                        title: "CAPTCHA Error",
-                        description:
-                          "Failed to verify CAPTCHA. Please try again.",
-                        variant: "destructive",
-                      });
-                    }}
-                  />
-                </div>
-
-                <Button
-                  onClick={handleSignIn}
-                  className="w-full"
-                  disabled={loading}
-                  data-testid="button-signin"
+                <form
+                  onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    handleSignIn();
+                  }}
+                  className="space-y-4"
                 >
-                  {loading ? "Signing in..." : "Sign In"}
-                </Button>
+                  <div>
+                    <Label htmlFor="signin-email">Email address</Label>
+                    <div className="relative mt-2">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        autoComplete="email"
+                        className="pl-10"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        data-testid="input-email"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="relative mt-2">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signin-password"
+                        type="password"
+                        placeholder="Enter your password"
+                        autoComplete="current-password"
+                        className="pl-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        data-testid="input-password"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center py-4">
+                    <HCaptcha
+                      ref={captchaRef}
+                      sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY || ""}
+                      onVerify={(token) => setCaptchaToken(token)}
+                      onError={() => {
+                        setCaptchaToken(null);
+                        toast({
+                          title: "CAPTCHA Error",
+                          description:
+                            "Failed to verify CAPTCHA. Please try again.",
+                          variant: "destructive",
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
+                    data-testid="button-signin"
+                  >
+                    {loading ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
+
                 <div className="text-center mt-2">
                   <button
                     type="button"
@@ -297,63 +308,73 @@ export default function AuthForm() {
               </TabsContent>
 
               <TabsContent value="signup" className="space-y-4">
-                <div>
-                  <Label htmlFor="signup-email">Email address</Label>
-                  <div className="relative mt-2">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="Enter your email"
-                      className="pl-10"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      data-testid="input-email-signup"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="signup-password">Password</Label>
-                  <div className="relative mt-2">
-                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="signup-password"
-                      type="password"
-                      placeholder="Enter your password"
-                      className="pl-10"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      data-testid="input-password-signup"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-center py-4">
-                  <HCaptcha
-                    ref={captchaRef}
-                    sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY || ""}
-                    onVerify={(token) => setCaptchaToken(token)}
-                    onError={() => {
-                      setCaptchaToken(null);
-                      toast({
-                        title: "CAPTCHA Error",
-                        description:
-                          "Failed to verify CAPTCHA. Please try again.",
-                        variant: "destructive",
-                      });
-                    }}
-                  />
-                </div>
-
-                <Button
-                  onClick={handleSignUp}
-                  className="w-full"
-                  disabled={loading}
-                  data-testid="button-signup"
+                <form
+                  onSubmit={(e: FormEvent) => {
+                    e.preventDefault();
+                    handleSignUp();
+                  }}
+                  className="space-y-4"
                 >
-                  {loading ? "Signing up..." : "Sign Up"}
-                </Button>
+                  <div>
+                    <Label htmlFor="signup-email">Email address</Label>
+                    <div className="relative mt-2">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        autoComplete="email"
+                        className="pl-10"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        data-testid="input-email-signup"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signup-password">Password</Label>
+                    <div className="relative mt-2">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signup-password"
+                        type="password"
+                        placeholder="Enter your password"
+                        autoComplete="new-password"
+                        className="pl-10"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        data-testid="input-password-signup"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center py-4">
+                    <HCaptcha
+                      ref={captchaRef}
+                      sitekey={import.meta.env.VITE_HCAPTCHA_SITEKEY || ""}
+                      onVerify={(token) => setCaptchaToken(token)}
+                      onError={() => {
+                        setCaptchaToken(null);
+                        toast({
+                          title: "CAPTCHA Error",
+                          description:
+                            "Failed to verify CAPTCHA. Please try again.",
+                          variant: "destructive",
+                        });
+                      }}
+                    />
+                  </div>
+
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
+                    data-testid="button-signup"
+                  >
+                    {loading ? "Signing up..." : "Sign Up"}
+                  </Button>
+                </form>
               </TabsContent>
             </Tabs>
           </CardContent>

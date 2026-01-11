@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "wouter";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -124,26 +124,29 @@ export default function ResetPassword() {
         </div>
 
         <div className="bg-white shadow-xl rounded-lg p-6">
-          <div className="space-y-4">
+          <form
+            onSubmit={(e: FormEvent) => {
+              e.preventDefault();
+              handleUpdate();
+            }}
+            className="space-y-4"
+          >
             <div>
               <Label htmlFor="new-password">New password</Label>
               <Input
                 id="new-password"
                 type="password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="mt-2"
               />
             </div>
 
-            <Button
-              onClick={handleUpdate}
-              className="w-full"
-              disabled={loading}
-            >
+            <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Updating..." : "Update password"}
             </Button>
-          </div>
+          </form>
         </div>
       </div>
     </div>
