@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.orders (
     session_id UUID REFERENCES public.table_sessions(id) ON DELETE CASCADE,
     status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled')),
     total NUMERIC DEFAULT 0,
+    suggestion TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

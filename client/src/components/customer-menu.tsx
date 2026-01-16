@@ -239,9 +239,9 @@ export default function CustomerMenu() {
           )}
           <p className="text-gray-600">Welcome in Our Restaurant</p>
           <p className="text-gray-600">
-            <a href="https://">Facebook🍳</a>
-            <a href="https://">Instagram📸</a>
-            <a href="https://">Twitter🐦</a>
+            <a href="https://facebook.com">Facebook🍳</a>
+            <a href="https://instagram.com">Instagram📸</a>
+            <a href="https://twitter.com">Twitter🐦</a>
           </p>
         </div>
 

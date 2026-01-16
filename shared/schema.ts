@@ -57,6 +57,7 @@ export const orders = pgTable("orders", {
   sessionId: uuid("session_id").references(() => tableSessions.id, { onDelete: "cascade" }),
   status: text("status").default("pending"),
   total: numeric("total").default("0"),
+  suggestion: text("suggestion"),
   createdAt: timestamp("created_at").default(sql`now()`),
   updatedAt: timestamp("updated_at").default(sql`now()`),
 });
