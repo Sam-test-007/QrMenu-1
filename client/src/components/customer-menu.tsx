@@ -37,61 +37,58 @@ export default function CustomerMenu() {
   const [suggestion, setSuggestion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [tableInfo, setTableInfo] = useState<{
+    table_number: number;
+    name?: string;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Extract table number from URL query parameters
+  // Extract token from URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
-  const tableNumber = urlParams.get("table");
+  const token = urlParams.get("token");
 
   useEffect(() => {
-    if (slug) {
-      loadMenu();
+    if (slug && token) {
+      validateTokenAndLoadMenu();
+    } else {
+      setError("Invalid access. Please scan a valid QR code.");
+      setLoading(false);
     }
-  }, [slug]);
+  }, [slug, token]);
 
-  const loadMenu = async () => {
+  const validateTokenAndLoadMenu = async () => {
     try {
-      const { data: restaurant, error: restaurantError } = await supabase
-        .from("restaurants")
-        .select("*")
-        .eq("slug", slug)
-        .single();
+      const response = await fetch("/api/validate-token", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
 
-      if (restaurantError) throw restaurantError;
-
-      if (restaurant) {
-        // Supabase may return snake_case (image_url) or camelCase (imageUrl)
-        setRestaurantImageUrl(
-          (restaurant as any).image_url ?? restaurant.imageUrl ?? null
-        );
-        const { data: items, error: itemsError } = await supabase
-          .from("menu_items")
-          .select("id,name,price,available,description,image_url,category")
-          .eq("restaurant_id", restaurant.id)
-          .eq("available", true)
-          .order("created_at", { ascending: true });
-
-        if (itemsError) throw itemsError;
-
-        const mapped = (items || []).map((item) => ({
-          ...item,
-          imageUrl: item.image_url,
-          category: (item as any).category ?? null,
-          quantity: 0,
-        }));
-
-        setMenu({
-          name: restaurant.name,
-          items: mapped,
-        });
-
-        const cats = Array.from(
-          new Set(mapped.map((i) => i.category || "Uncategorized"))
-        );
-        setSelectedCategory(cats.length ? cats[0] : null);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Invalid token");
       }
-    } catch (error) {
-      console.error("Error loading menu:", error);
-      setMenu({ name: "Menu not found", items: [] });
+
+      const data = await response.json();
+      setSessionId(data.session_id);
+      setTableInfo({
+        table_number: data.table_id ? 0 : 0, // Will be updated from menu data
+        name: data.table_name,
+      });
+
+      // Load menu data
+      setMenu({
+        name: data.restaurant.name,
+        items: data.menu.map((item: any) => ({
+          ...item,
+          imageUrl: item.image_url, // Convert snake_case to camelCase
+          quantity: 0,
+        })),
+      });
+      setRestaurantImageUrl(data.restaurant.image_url);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -137,44 +134,30 @@ export default function CustomerMenu() {
   }, [menu.items, searchQuery, selectedCategory]);
   // Add this after the existing itemsInOrder useMemo
   const placeOrder = async () => {
-    if (!itemsInOrder.length || !slug) return;
+    if (!itemsInOrder.length || !sessionId) return;
 
     try {
-      const { data: restaurant, error: restaurantError } = await supabase
-        .from("restaurants")
-        .select("id")
-        .eq("slug", slug)
-        .single();
-
-      if (restaurantError || !restaurant) {
-        throw new Error("Restaurant not found");
-      }
-
       const orderData = {
-        restaurant_id: restaurant.id,
-        table_number: tableNumber,
-        status: "pending",
-        total: total,
-        suggestion:
-          typeof suggestion === "string" && suggestion.trim().length
-            ? suggestion.trim()
-            : null,
+        session_id: sessionId,
         items: itemsInOrder.map((item) => ({
-          id: item.id,
-          name: item.name,
-          price: item.price,
+          menu_item_id: item.id,
           quantity: item.quantity,
         })),
+        suggestion: suggestion.trim() || null,
       };
 
-      const { error: orderError } = await supabase
-        .from("orders")
-        .insert([orderData]);
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(orderData),
+      });
 
-      if (orderError) {
-        console.error("Order error:", orderError);
-        throw new Error("Failed to create order.");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to place order");
       }
+
+      const result = await response.json();
 
       // Reset order after successful submission
       setMenu((prev) => ({
@@ -183,7 +166,7 @@ export default function CustomerMenu() {
       }));
       setSuggestion("");
 
-      alert("Order placed successfully! Please wait for your server.");
+      alert(`Order placed successfully! Order #${result.order_id}`);
     } catch (error: any) {
       console.error("Error placing order:", error);
       alert(error.message || "Failed to place order. Please try again.");
@@ -194,6 +177,23 @@ export default function CustomerMenu() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">Loading menu...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+            Access Denied
+          </h1>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <p className="text-sm text-gray-500">
+            Please scan a valid QR code from your table to access the menu.
+          </p>
+        </div>
       </div>
     );
   }
@@ -226,14 +226,14 @@ export default function CustomerMenu() {
           >
             {menu.name}
           </h1>
-          {tableNumber && (
+          {tableInfo && (
             <div className="mb-2">
               <Badge
                 variant="outline"
                 className="text-lg px-4 py-1 bg-emerald-50 border-emerald-200 text-emerald-700"
                 data-testid="text-table-number"
               >
-                🪑 Table {tableNumber}
+                🪑 Table {tableInfo.name || tableInfo.table_number}
               </Badge>
             </div>
           )}

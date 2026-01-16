@@ -44,6 +44,37 @@ CREATE TABLE IF NOT EXISTS public.tables (
     UNIQUE (restaurant_id, table_number)
 );
 
+-- Create table_sessions table for QR token sessions
+CREATE TABLE IF NOT EXISTS public.table_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    table_id UUID REFERENCES public.tables(id) ON DELETE CASCADE,
+    token TEXT NOT NULL UNIQUE,
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    last_activity TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create orders table
+CREATE TABLE IF NOT EXISTS public.orders (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id UUID REFERENCES public.table_sessions(id) ON DELETE CASCADE,
+    status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'confirmed', 'preparing', 'ready', 'completed', 'cancelled')),
+    total NUMERIC DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Create order_items table
+CREATE TABLE IF NOT EXISTS public.order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    order_id UUID REFERENCES public.orders(id) ON DELETE CASCADE,
+    menu_item_id UUID REFERENCES public.menu_items(id) ON DELETE CASCADE,
+    quantity INTEGER NOT NULL DEFAULT 1,
+    price NUMERIC NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_restaurants_owner_id ON public.restaurants(owner_id);
 CREATE INDEX IF NOT EXISTS idx_restaurants_slug ON public.restaurants(slug);
@@ -52,11 +83,22 @@ CREATE INDEX IF NOT EXISTS idx_menu_items_available ON public.menu_items(availab
 CREATE INDEX IF NOT EXISTS idx_tables_restaurant_id ON public.tables(restaurant_id);
 CREATE INDEX IF NOT EXISTS idx_tables_active ON public.tables(active);
 
+-- Indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_table_sessions_table_id ON public.table_sessions(table_id);
+CREATE INDEX IF NOT EXISTS idx_table_sessions_active ON public.table_sessions(active);
+CREATE INDEX IF NOT EXISTS idx_table_sessions_expires_at ON public.table_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_orders_session_id ON public.orders(session_id);
+CREATE INDEX IF NOT EXISTS idx_orders_status ON public.orders(status);
+CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON public.order_items(order_id);
+
 -- Enable Row Level Security (RLS) on all tables
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.restaurants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.menu_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tables ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.table_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.order_items ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for profiles table
 -- Users can view their own profile
@@ -173,6 +215,91 @@ CREATE POLICY "Owners can delete own tables" ON public.tables
     );
 
 -- Note: No public access to tables is allowed for security
+
+-- RLS Policies for table_sessions table
+-- Restaurant owners can view sessions for their tables
+CREATE POLICY "Owners can view own table sessions" ON public.table_sessions
+    FOR SELECT USING (
+        auth.uid() IN (
+            SELECT r.owner_id FROM public.restaurants r
+            JOIN public.tables t ON t.restaurant_id = r.id
+            WHERE t.id = table_id
+        )
+    );
+
+-- Allow public to create sessions (for QR scanning) but only if table is active
+CREATE POLICY "Public can create table sessions for active tables" ON public.table_sessions
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.tables t
+            WHERE t.id = table_id AND t.active = true
+        )
+    );
+
+-- Restaurant owners can update sessions for their tables
+CREATE POLICY "Owners can update own table sessions" ON public.table_sessions
+    FOR UPDATE USING (
+        auth.uid() IN (
+            SELECT r.owner_id FROM public.restaurants r
+            JOIN public.tables t ON t.restaurant_id = r.id
+            WHERE t.id = table_id
+        )
+    );
+
+-- RLS Policies for orders table
+-- Restaurant owners can view orders for their sessions
+CREATE POLICY "Owners can view own orders" ON public.orders
+    FOR SELECT USING (
+        auth.uid() IN (
+            SELECT r.owner_id FROM public.restaurants r
+            JOIN public.tables t ON t.restaurant_id = r.id
+            JOIN public.table_sessions ts ON ts.table_id = t.id
+            WHERE ts.id = session_id
+        )
+    );
+
+-- Allow public to create orders but only for active sessions
+CREATE POLICY "Public can create orders for active sessions" ON public.orders
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.table_sessions ts
+            WHERE ts.id = session_id AND ts.active = true AND ts.expires_at > NOW()
+        )
+    );
+
+-- Restaurant owners can update orders for their sessions
+CREATE POLICY "Owners can update own orders" ON public.orders
+    FOR UPDATE USING (
+        auth.uid() IN (
+            SELECT r.owner_id FROM public.restaurants r
+            JOIN public.tables t ON t.restaurant_id = r.id
+            JOIN public.table_sessions ts ON ts.table_id = t.id
+            WHERE ts.id = session_id
+        )
+    );
+
+-- RLS Policies for order_items table
+-- Restaurant owners can view order items for their orders
+CREATE POLICY "Owners can view own order items" ON public.order_items
+    FOR SELECT USING (
+        auth.uid() IN (
+            SELECT r.owner_id FROM public.restaurants r
+            JOIN public.tables t ON t.restaurant_id = r.id
+            JOIN public.table_sessions ts ON ts.table_id = t.id
+            JOIN public.orders o ON o.session_id = ts.id
+            WHERE o.id = order_id
+        )
+    );
+
+-- Allow public to create order items for their orders
+CREATE POLICY "Public can create order items for own orders" ON public.order_items
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.orders o
+            JOIN public.table_sessions ts ON ts.id = o.session_id
+            WHERE o.id = order_id AND ts.active = true AND ts.expires_at > NOW()
+        )
+    );
 
 -- Function to automatically create a profile when a user signs up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
@@ -355,6 +482,96 @@ $$ LANGUAGE plpgsql;
 GRANT EXECUTE ON FUNCTION public.get_menu_by_restaurant_slug(TEXT) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_menu_by_restaurant_slug(TEXT) TO authenticated;
 
+-- Function to create or get active table session
+CREATE OR REPLACE FUNCTION public.create_table_session(
+    p_table_id UUID,
+    p_token TEXT,
+    p_expires_at TIMESTAMP WITH TIME ZONE
+) RETURNS UUID AS $$
+DECLARE
+    session_id UUID;
+BEGIN
+    -- Deactivate any existing active sessions for this table
+    UPDATE public.table_sessions
+    SET active = false
+    WHERE table_id = p_table_id AND active = true;
+
+    -- Insert new session
+    INSERT INTO public.table_sessions (table_id, token, expires_at)
+    VALUES (p_table_id, p_token, p_expires_at)
+    RETURNING id INTO session_id;
+
+    RETURN session_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to validate table session
+CREATE OR REPLACE FUNCTION public.validate_table_session(p_token TEXT) RETURNS TABLE(
+    session_id UUID,
+    table_id UUID,
+    restaurant_id UUID,
+    is_valid BOOLEAN
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ts.id,
+        ts.table_id,
+        t.restaurant_id,
+        (ts.active = true AND ts.expires_at > NOW()) as is_valid
+    FROM public.table_sessions ts
+    JOIN public.tables t ON t.id = ts.table_id
+    WHERE ts.token = p_token;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to get active sessions for a restaurant
+CREATE OR REPLACE FUNCTION public.get_active_sessions(p_restaurant_id UUID) RETURNS TABLE(
+    session_id UUID,
+    table_id UUID,
+    table_number INTEGER,
+    table_name TEXT,
+    created_at TIMESTAMP WITH TIME ZONE,
+    last_activity TIMESTAMP WITH TIME ZONE
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        ts.id,
+        ts.table_id,
+        t.table_number,
+        t.name,
+        ts.created_at,
+        ts.last_activity
+    FROM public.table_sessions ts
+    JOIN public.tables t ON t.id = ts.table_id
+    WHERE t.restaurant_id = p_restaurant_id 
+    AND ts.active = true 
+    AND ts.expires_at > NOW()
+    ORDER BY ts.last_activity DESC;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to close table session
+CREATE OR REPLACE FUNCTION public.close_table_session(p_session_id UUID) RETURNS BOOLEAN AS $$
+DECLARE
+    affected_rows INTEGER;
+BEGIN
+    UPDATE public.table_sessions
+    SET active = false
+    WHERE id = p_session_id;
+
+    GET DIAGNOSTICS affected_rows = ROW_COUNT;
+    RETURN affected_rows > 0;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Grant permissions
+GRANT EXECUTE ON FUNCTION public.create_table_session(UUID, TEXT, TIMESTAMP WITH TIME ZONE) TO anon;
+GRANT EXECUTE ON FUNCTION public.validate_table_session(TEXT) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_active_sessions(UUID) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.close_table_session(UUID) TO authenticated;
+
 -- Insert initial data for testing (optional - remove for production)
 -- This will only work after authentication is set up
 /*
@@ -377,6 +594,9 @@ COMMENT ON TABLE public.profiles IS 'User profiles linked to Supabase auth.users
 COMMENT ON TABLE public.restaurants IS 'Restaurant information with unique slugs for QR menu access';
 COMMENT ON TABLE public.menu_items IS 'Individual menu items for each restaurant';
 COMMENT ON TABLE public.tables IS 'Restaurant table management for QR code assignments';
+COMMENT ON TABLE public.table_sessions IS 'Active QR token sessions for table access';
+COMMENT ON TABLE public.orders IS 'Customer orders linked to table sessions';
+COMMENT ON TABLE public.order_items IS 'Individual items within orders';
 
 COMMENT ON COLUMN public.restaurants.slug IS 'URL-friendly unique identifier for restaurant menus';
 COMMENT ON COLUMN public.menu_items.available IS 'Whether the menu item is currently available for ordering';
@@ -384,6 +604,12 @@ COMMENT ON COLUMN public.menu_items.price IS 'Price in the restaurant''s local c
 COMMENT ON COLUMN public.tables.table_number IS 'Unique numeric identifier for tables within a restaurant';
 COMMENT ON COLUMN public.tables.name IS 'Optional descriptive name for the table (e.g., Window Table, VIP Table)';
 COMMENT ON COLUMN public.tables.active IS 'Whether the table is currently active for QR code access';
+COMMENT ON COLUMN public.table_sessions.token IS 'JWT token for secure QR access';
+COMMENT ON COLUMN public.table_sessions.active IS 'Whether the session is currently active';
+COMMENT ON COLUMN public.table_sessions.expires_at IS 'When the session expires';
+COMMENT ON COLUMN public.orders.status IS 'Order status: pending, confirmed, preparing, ready, completed, cancelled';
+COMMENT ON COLUMN public.order_items.quantity IS 'Number of this item ordered';
+COMMENT ON COLUMN public.order_items.price IS 'Price per item at time of order';
 
 -- Security note: All RLS policies ensure users can only access their own data
 -- Public access is granted only for viewing restaurants and available menu items

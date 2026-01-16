@@ -53,7 +53,9 @@ export default function AdminDashboard() {
   const [selectedRestaurant, setSelectedRestaurant] =
     useState<Restaurant | null>(null);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [tables, setTables] = useState<any[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [olderPage, setOlderPage] = useState(0);
   const pageSize = 20;
   const [hasMoreOlder, setHasMoreOlder] = useState(true);
@@ -79,6 +81,23 @@ export default function AdminDashboard() {
       return false;
     }
   });
+  const [showTablesPanel, setShowTablesPanel] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("tablesPanelOpen") === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+  const [showSessionsPanel, setShowSessionsPanel] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("sessionsPanelOpen") === "true";
+    } catch (e) {
+      return false;
+    }
+  });
+  const [showAddTableForm, setShowAddTableForm] = useState(false);
+  const [newTable, setNewTable] = useState({ table_number: "", name: "" });
+  const [editingTable, setEditingTable] = useState<any | null>(null);
 
   // Onboarding tour state
   const [showTour, setShowTour] = useState(false);
@@ -151,6 +170,26 @@ export default function AdminDashboard() {
     } catch (e) {}
   }, [showMenuPanel]);
 
+  // persist tables panel open state
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "tablesPanelOpen",
+        showTablesPanel ? "true" : "false"
+      );
+    } catch (e) {}
+  }, [showTablesPanel]);
+
+  // persist sessions panel open state
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        "sessionsPanelOpen",
+        showSessionsPanel ? "true" : "false"
+      );
+    } catch (e) {}
+  }, [showSessionsPanel]);
+
   // close on Escape and trap basic focus behavior
   useEffect(() => {
     if (!showMenuPanel) return;
@@ -160,6 +199,26 @@ export default function AdminDashboard() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [showMenuPanel]);
+
+  // close tables panel on Escape
+  useEffect(() => {
+    if (!showTablesPanel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowTablesPanel(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showTablesPanel]);
+
+  // close sessions panel on Escape
+  useEffect(() => {
+    if (!showSessionsPanel) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setShowSessionsPanel(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showSessionsPanel]);
 
   // Focus trap and return-focus for the menu panel
   useEffect(() => {
@@ -256,7 +315,9 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (selectedRestaurant) {
       loadMenuItems();
+      loadTables();
       loadOrders();
+      loadSessions();
 
       // Set up real-time subscription
       const ordersSubscription = supabase
@@ -288,6 +349,7 @@ export default function AdminDashboard() {
     } else {
       setMenuItems([]);
       setOrders([]);
+      setSessions([]);
     }
   }, [selectedRestaurant]);
 
@@ -337,7 +399,33 @@ export default function AdminDashboard() {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      setMenuItems(data || []);
+      // Convert snake_case to camelCase for consistency
+      const normalized = (data || []).map((item: any) => ({
+        ...item,
+        imageUrl: item.image_url ?? item.imageUrl ?? null,
+      }));
+      setMenuItems(normalized);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadTables = async () => {
+    if (!selectedRestaurant) return;
+
+    try {
+      const { data, error } = await supabase
+        .from("tables")
+        .select("*")
+        .eq("restaurant_id", selectedRestaurant.id)
+        .order("table_number", { ascending: true });
+
+      if (error) throw error;
+      setTables(data || []);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -429,40 +517,53 @@ export default function AdminDashboard() {
   const loadOrders = async () => {
     if (!selectedRestaurant) return;
     try {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const startIso = startOfDay.toISOString();
+      const response = await fetch(
+        `/api/restaurants/${selectedRestaurant.id}/orders`
+      );
+      if (!response.ok) throw new Error("Failed to load orders");
 
-      // Load today's orders first
-      const [
-        { data: todayData, error: todayErr },
-        { data: olderData, error: olderErr },
-      ] = await Promise.all([
-        supabase
-          .from("orders")
-          .select("*")
-          .eq("restaurant_id", selectedRestaurant.id)
-          .gte("created_at", startIso)
-          .order("created_at", { ascending: false }),
-        // load first page of older orders (created before today)
-        supabase
-          .from("orders")
-          .select("*")
-          .eq("restaurant_id", selectedRestaurant.id)
-          .lt("created_at", startIso)
-          .order("created_at", { ascending: false })
-          .range(0, pageSize - 1),
-      ]);
-
-      if (todayErr || olderErr) throw todayErr || olderErr;
-
-      setOrders([...(todayData || []), ...(olderData || [])]);
-      setOlderPage(1);
-      setHasMoreOlder((olderData || []).length === pageSize);
+      const data = await response.json();
+      setOrders(
+        data.map((order: any) => ({
+          id: order.id,
+          table_number:
+            order.table_sessions?.tables?.table_number?.toString() || null,
+          status: order.status,
+          total: order.total,
+          items:
+            order.order_items?.map((item: any) => ({
+              id: item.id,
+              name: item.menu_items?.name || "",
+              price: item.price?.toString() || "",
+              quantity: item.quantity,
+            })) || [],
+          created_at: order.created_at,
+          suggestion: order.suggestion,
+        }))
+      );
     } catch (error: any) {
       toast({
         title: "Error",
         description: "Failed to load orders",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const loadSessions = async () => {
+    if (!selectedRestaurant) return;
+    try {
+      const response = await fetch(
+        `/api/restaurants/${selectedRestaurant.id}/sessions`
+      );
+      if (!response.ok) throw new Error("Failed to load sessions");
+
+      const data = await response.json();
+      setSessions(data);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to load sessions",
         variant: "destructive",
       });
     }
@@ -729,6 +830,75 @@ export default function AdminDashboard() {
       onConfirm: async () => await deleteMenuItemConfirmed(id),
     });
     setConfirmOpen(true);
+  };
+
+  const addTable = async () => {
+    if (!selectedRestaurant || !newTable.table_number) {
+      toast({
+        title: "Error",
+        description: "Table number is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("tables")
+        .insert([
+          {
+            restaurant_id: selectedRestaurant.id,
+            table_number: parseInt(newTable.table_number),
+            name: newTable.name || null,
+            active: true,
+          },
+        ])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setTables((prev) => [...prev, data]);
+      setNewTable({ table_number: "", name: "" });
+      toast({
+        title: "Success",
+        description: "Table added successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteTable = (id: string) => {
+    setConfirmPayload({
+      title: "Delete table",
+      description: "Are you sure you want to delete this table?",
+      confirmLabel: "Delete",
+      onConfirm: async () => await deleteTableConfirmed(id),
+    });
+    setConfirmOpen(true);
+  };
+
+  const deleteTableConfirmed = async (id: string) => {
+    try {
+      const { error } = await supabase.from("tables").delete().eq("id", id);
+
+      if (error) throw error;
+      setTables((prev) => prev.filter((table) => table.id !== id));
+      toast({
+        title: "Success",
+        description: "Table deleted successfully!",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const updateOrderStatus = async (
@@ -1750,6 +1920,36 @@ export default function AdminDashboard() {
                     </button>
                   )}
 
+                  {/* Tables Panel Toggle */}
+                  {!showTablesPanel && (
+                    <button
+                      onClick={() => setShowTablesPanel(true)}
+                      aria-label="Open tables panel"
+                      title="Open Tables"
+                      className="fixed left-4 top-1/2 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl mt-16"
+                    >
+                      <QrCode className="h-5 w-5 text-gray-700" />
+                      <span className="hidden md:inline text-sm font-medium text-gray-700">
+                        Tables
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Sessions Panel Toggle */}
+                  {!showSessionsPanel && (
+                    <button
+                      onClick={() => setShowSessionsPanel(true)}
+                      aria-label="Open sessions panel"
+                      title="Open Sessions"
+                      className="fixed left-4 top-1/2 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl mt-32"
+                    >
+                      <Calendar className="h-5 w-5 text-gray-700" />
+                      <span className="hidden md:inline text-sm font-medium text-gray-700">
+                        Sessions
+                      </span>
+                    </button>
+                  )}
+
                   {/* overlay */}
                   {showMenuPanel && (
                     <div
@@ -2120,6 +2320,294 @@ export default function AdminDashboard() {
                                   </div>
                                 </div>
                               </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tables Panel */}
+                <div>
+                  {/* overlay */}
+                  {showTablesPanel && (
+                    <div
+                      className="fixed inset-0 z-30 bg-black bg-opacity-30"
+                      aria-hidden
+                      onClick={() => setShowTablesPanel(false)}
+                    />
+                  )}
+
+                  {/* panel */}
+                  <div
+                    className={`fixed z-40 transition-transform duration-300 ${
+                      showTablesPanel
+                        ? "translate-x-0 translate-y-0"
+                        : "-translate-x-full translate-y-full"
+                    } lg:inset-y-0 lg:left-0 lg:w-80 lg:h-full sm:inset-x-0 sm:bottom-0 sm:h-1/2`}
+                  >
+                    <div className="w-full lg:w-80 h-full bg-white shadow-xl overflow-auto rounded-t-lg lg:rounded-none">
+                      <div className="p-4 border-b flex items-center justify-between">
+                        <h3
+                          id="tables-panel-title"
+                          className="text-lg font-semibold"
+                        >
+                          Tables
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setShowAddTableForm(!showAddTableForm)
+                            }
+                            title="Add new table"
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Add Table
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowTablesPanel(false)}
+                            title="Close panel"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div
+                        className="p-4 space-y-4"
+                        id="tables-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="tables-panel-title"
+                        ref={panelRef}
+                        tabIndex={-1}
+                      >
+                        {/* Add Table Form */}
+                        {showAddTableForm && (
+                          <div className="border rounded-lg p-4 space-y-3">
+                            <h4 className="font-medium">Add New Table</h4>
+                            <div>
+                              <Label htmlFor="table-number">
+                                Table Number *
+                              </Label>
+                              <Input
+                                id="table-number"
+                                type="number"
+                                value={newTable.table_number}
+                                onChange={(e) =>
+                                  setNewTable((prev) => ({
+                                    ...prev,
+                                    table_number: e.target.value,
+                                  }))
+                                }
+                                placeholder="e.g. 1"
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="table-name">
+                                Table Name (Optional)
+                              </Label>
+                              <Input
+                                id="table-name"
+                                value={newTable.name}
+                                onChange={(e) =>
+                                  setNewTable((prev) => ({
+                                    ...prev,
+                                    name: e.target.value,
+                                  }))
+                                }
+                                placeholder="e.g. Window Seat"
+                              />
+                            </div>
+                            <div className="flex space-x-2">
+                              <Button onClick={addTable} className="flex-1">
+                                Add Table
+                              </Button>
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setShowAddTableForm(false);
+                                  setNewTable({ table_number: "", name: "" });
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tables List */}
+                        <div className="space-y-2">
+                          {tables.map((table) => (
+                            <div
+                              key={table.id}
+                              className="flex items-center justify-between p-3 border rounded-lg"
+                            >
+                              <div>
+                                <div className="font-medium">
+                                  {table.name || `Table ${table.table_number}`}
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                  Table #{table.table_number}
+                                </div>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteTable(table.id)}
+                                title="Delete table"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
+                          ))}
+                          {tables.length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                              <QrCode className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                              <p>No tables added yet</p>
+                              <p className="text-sm">
+                                Add tables to generate QR codes
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Sessions Panel */}
+                <div>
+                  {/* overlay */}
+                  {showSessionsPanel && (
+                    <div
+                      className="fixed inset-0 z-30 bg-black bg-opacity-30"
+                      aria-hidden
+                      onClick={() => setShowSessionsPanel(false)}
+                    />
+                  )}
+
+                  {/* panel */}
+                  <div
+                    className={`fixed z-40 transition-transform duration-300 ${
+                      showSessionsPanel
+                        ? "translate-x-0 translate-y-0"
+                        : "-translate-x-full translate-y-full"
+                    } lg:inset-y-0 lg:left-0 lg:w-80 lg:h-full sm:inset-x-0 sm:bottom-0 sm:h-1/2`}
+                  >
+                    <div className="w-full lg:w-80 h-full bg-white shadow-xl overflow-auto rounded-t-lg lg:rounded-none">
+                      <div className="p-4 border-b flex items-center justify-between">
+                        <h3
+                          id="sessions-panel-title"
+                          className="text-lg font-semibold"
+                        >
+                          Active Table Sessions
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowSessionsPanel(false)}
+                            title="Close sessions panel"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div
+                        className="p-4 space-y-4"
+                        id="sessions-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="sessions-panel-title"
+                        ref={panelRef}
+                        tabIndex={-1}
+                      >
+                        <p className="text-xs text-gray-500 mb-3">
+                          Tip: tap the <strong>Sessions</strong> button to open
+                          this panel. On phones this opens as a bottom sheet.
+                        </p>
+                        <div className="space-y-4">
+                          {sessions.map((session) => (
+                            <div
+                              key={session.session_id}
+                              className="p-4 border rounded-lg"
+                            >
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
+                                  <h4 className="font-medium">
+                                    {session.table_name ||
+                                      `Table ${session.table_number}`}
+                                  </h4>
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Started at{" "}
+                                    {new Date(
+                                      session.created_at
+                                    ).toLocaleTimeString()}
+                                  </p>
+                                  <p className="text-sm text-gray-500">
+                                    Last activity:{" "}
+                                    {new Date(
+                                      session.last_activity
+                                    ).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setConfirmPayload({
+                                      title: "Close session",
+                                      description:
+                                        "Are you sure you want to close this table session?",
+                                      confirmLabel: "Close Session",
+                                      onConfirm: async () => {
+                                        try {
+                                          const response = await fetch(
+                                            `/api/sessions/${session.session_id}/close`,
+                                            {
+                                              method: "POST",
+                                            }
+                                          );
+                                          if (!response.ok)
+                                            throw new Error(
+                                              "Failed to close session"
+                                            );
+                                          loadSessions();
+                                          toast({
+                                            title: "Success",
+                                            description:
+                                              "Session closed successfully",
+                                          });
+                                        } catch (error: any) {
+                                          toast({
+                                            title: "Error",
+                                            description:
+                                              "Failed to close session",
+                                            variant: "destructive",
+                                          });
+                                        }
+                                      },
+                                    });
+                                    setConfirmOpen(true);
+                                  }}
+                                  title="Close this session"
+                                >
+                                  Close Session
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+
+                          {sessions.length === 0 && (
+                            <div className="text-center py-6 text-gray-500">
+                              No active sessions
                             </div>
                           )}
                         </div>

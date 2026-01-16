@@ -42,6 +42,34 @@ export const tables = pgTable("tables", {
   uniqueTableNumber: sql`UNIQUE (restaurant_id, table_number)`, // Unique table number per restaurant
 }));
 
+export const tableSessions = pgTable("table_sessions", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  tableId: uuid("table_id").references(() => tables.id, { onDelete: "cascade" }),
+  token: text("token").notNull(),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  expiresAt: timestamp("expires_at").notNull(),
+  lastActivity: timestamp("last_activity").default(sql`now()`),
+});
+
+export const orders = pgTable("orders", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: uuid("session_id").references(() => tableSessions.id, { onDelete: "cascade" }),
+  status: text("status").default("pending"),
+  total: numeric("total").default("0"),
+  createdAt: timestamp("created_at").default(sql`now()`),
+  updatedAt: timestamp("updated_at").default(sql`now()`),
+});
+
+export const orderItems = pgTable("order_items", {
+  id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderId: uuid("order_id").references(() => orders.id, { onDelete: "cascade" }),
+  menuItemId: uuid("menu_item_id").references(() => menuItems.id, { onDelete: "cascade" }),
+  quantity: integer("quantity").default(1).notNull(),
+  price: numeric("price").notNull(),
+  createdAt: timestamp("created_at").default(sql`now()`),
+});
+
 export const insertProfileSchema = createInsertSchema(profiles).omit({
   id: true,
   createdAt: true,
@@ -62,6 +90,23 @@ export const insertTableSchema = createInsertSchema(tables).omit({
   createdAt: true,
 });
 
+export const insertTableSessionSchema = createInsertSchema(tableSessions).omit({
+  id: true,
+  createdAt: true,
+  lastActivity: true,
+});
+
+export const insertOrderSchema = createInsertSchema(orders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertOrderItemSchema = createInsertSchema(orderItems).omit({
+  id: true,
+  createdAt: true,
+});
+
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
 export type Profile = typeof profiles.$inferSelect;
 
@@ -73,3 +118,12 @@ export type MenuItem = typeof menuItems.$inferSelect;
 
 export type InsertTable = z.infer<typeof insertTableSchema>;
 export type Table = typeof tables.$inferSelect;
+
+export type InsertTableSession = z.infer<typeof insertTableSessionSchema>;
+export type TableSession = typeof tableSessions.$inferSelect;
+
+export type InsertOrder = z.infer<typeof insertOrderSchema>;
+export type Order = typeof orders.$inferSelect;
+
+export type InsertOrderItem = z.infer<typeof insertOrderItemSchema>;
+export type OrderItem = typeof orderItems.$inferSelect;
