@@ -8,53 +8,61 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-producti
 export async function registerRoutes(app: Express): Promise<Server> {
   // API routes for QR menu system
 
-  // Generate QR token for a table
-  app.post('/api/tables/:tableId/generate-token', async (req, res) => {
-    try {
-      const { tableId } = req.params;
-      const { expiresIn = '2h' } = req.body; // default 2 hours
+// Generate QR token for a table
+app.post('/api/tables/:tableId/generate-token', async (req, res) => {
+  try {
+    const { tableId } = req.params;
+    const { expiresIn = '2m' } = req.body; // default 2 minutes for testing
+    
 
-      // Verify table exists and user owns it
-      const { data: table, error } = await supabase
-        .from('tables')
-        .select('*, restaurants(owner_id)')
-        .eq('id', tableId)
-        .single();
+    // Verify table exists
+    const { data: table, error } = await supabase
+      .from('tables')
+      .select('*, restaurants(owner_id)')
+      .eq('id', tableId)
+      .single();
 
-      if (error || !table) {
-        return res.status(404).json({ error: 'Table not found' });
-      }
+    if (error || !table) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
 
-      // Check ownership (in production, verify auth)
-      // For now, allow public generation
+    const issuedAt = Math.floor(Date.now() / 1000);
+    const expiresAt = issuedAt + (expiresIn === '2h' ? 7200 : expiresIn === '1h' ? 3600 : expiresIn === '2m' ? 120 : 120); // 2h, 1h, or 2m, default 2m
+    
 
-      const issuedAt = Math.floor(Date.now() / 1000);
-      const expiresAt = issuedAt + (expiresIn === '2h' ? 7200 : 3600); // 2h or 1h
-
-      const token = jwt.sign({
+    const token = jwt.sign(
+      {
         restaurant_id: table.restaurant_id,
         table_id: tableId,
         issued_at: issuedAt,
         expires_at: expiresAt
-      }, JWT_SECRET);
+      },
+      JWT_SECRET
+    );
 
-      // Create session in DB
-      const { data: session, error: sessionError } = await supabase
-        .rpc('create_table_session', {
-          p_table_id: tableId,
-          p_token: token,
-          p_expires_at: new Date(expiresAt * 1000).toISOString()
-        });
+    // Create session in DB
+    const { data: session, error: sessionError } = await supabase
+      .rpc('create_table_session', {
+        p_table_id: tableId,
+        p_token: token,
+        p_expires_at: new Date(expiresAt * 1000).toISOString()
+      });
 
-      if (sessionError) {
-        return res.status(500).json({ error: 'Failed to create session' });
-      }
-
-      res.json({ token, session_id: session });
-    } catch (err) {
-      res.status(500).json({ error: 'Internal server error' });
+    if (sessionError) {
+      return res.status(500).json({ error: 'Failed to create session' });
     }
-  });
+
+    res.json({
+      token,
+      session_id: session,
+      expires_in: expiresIn === '2h' ? 7200 : expiresIn === '1h' ? 3600 : expiresIn === '2m' ? 120 : 120
+      
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
   // Validate QR token and get menu
   app.post('/api/validate-token', async (req, res) => {
@@ -139,18 +147,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid order data' });
       }
 
-      // Validate session
-      const { data: session, error: sessionError } = await supabase
+      // Validate session and get restaurant_id
+      const { data: sessionData, error: sessionError } = await supabase
         .from('table_sessions')
-        .select('id, active, expires_at, tables!inner(restaurant_id)')
+        .select('id, active, expires_at, table_id')
         .eq('id', session_id)
         .single();
 
-      if (sessionError || !session || !session.active || new Date(session.expires_at) < new Date()) {
+      if (sessionError || !sessionData || !sessionData.active || new Date(sessionData.expires_at) < new Date()) {
         return res.status(401).json({ error: 'Invalid session' });
       }
 
-      const restaurantId = session.tables.restaurant_id;
+      // Get restaurant_id from tables
+      const { data: tableData, error: tableError } = await supabase
+        .from('tables')
+        .select('restaurant_id')
+        .eq('id', sessionData.table_id)
+        .single();
+
+      if (tableError || !tableData) {
+        return res.status(500).json({ error: 'Failed to get restaurant info' });
+      }
+
+      const restaurantId = tableData.restaurant_id;
 
       // Rate limiting: check recent orders from this session
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();

@@ -44,50 +44,117 @@ export default function CustomerMenu() {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Extract token from URL query parameters
+  // Extract parameters from URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
   const token = urlParams.get("token");
+  const tableId = urlParams.get("table");
 
   useEffect(() => {
-    if (slug && token) {
+    if (token) {
+      // Token provided - validate it
       validateTokenAndLoadMenu();
+    } else if (tableId) {
+      // No token but table ID provided - generate fresh token (QR scan)
+      generateFreshTokenForTable(tableId);
     } else {
       setError("Invalid access. Please scan a valid QR code.");
       setLoading(false);
     }
-  }, [slug, token]);
+  }, [token, tableId]);
 
-  const validateTokenAndLoadMenu = async () => {
+  // Periodic session refresh to prevent expiration
+  useEffect(() => {
+    if (!sessionId || !token) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
+        // Check if session is still valid
+        const response = await fetch("/api/validate-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token }),
+        });
+
+        if (!response.ok) {
+          // Session expired - don't auto-refresh
+          // User needs to scan QR code again for new session
+          console.log("Session expired - user needs to scan QR again");
+        }
+      } catch (error) {
+        console.error("Session refresh check failed:", error);
+      }
+    }, 30 * 1000); // Check every 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, [sessionId, token, slug]);
+
+  const generateFreshTokenForTable = async (tableId: string) => {
     try {
-      const response = await fetch("/api/validate-token", {
+      const response = await fetch(`/api/tables/${tableId}/generate-token`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ expiresIn: "2m" }),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Invalid token");
+        throw new Error(errorData.error || "Failed to generate token");
       }
 
       const data = await response.json();
-      setSessionId(data.session_id);
-      setTableInfo({
-        table_number: data.table_number,
-        name: data.table_name,
-      });
 
-      // Load menu data
-      setMenu({
-        name: data.restaurant.name,
-        items: data.menu.map((item: any) => ({
-          ...item,
-          imageUrl: item.image_url, // Convert snake_case to camelCase
-          quantity: 0,
-        })),
-      });
-      setRestaurantImageUrl(data.restaurant.image_url);
+      // Update URL with the new token
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.set("token", data.token);
+      newUrl.searchParams.delete("table"); // Remove table param since we now have token
+      window.history.replaceState({}, "", newUrl.toString());
+
+      // Now validate the new token
+      await validateToken(data.token);
     } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const validateToken = async (tokenToValidate: string) => {
+    const response = await fetch("/api/validate-token", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: tokenToValidate }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Invalid token");
+    }
+
+    const data = await response.json();
+    setSessionId(data.session_id);
+    setTableInfo({
+      table_number: data.table_number,
+      name: data.table_name,
+    });
+
+    // Load menu data
+    setMenu({
+      name: data.restaurant.name,
+      items: data.menu.map((item: any) => ({
+        ...item,
+        imageUrl: item.image_url, // Convert snake_case to camelCase
+        quantity: 0,
+      })),
+    });
+    setRestaurantImageUrl(data.restaurant.image_url);
+  };
+
+  const validateTokenAndLoadMenu = async () => {
+    try {
+      await validateToken(token!);
+    } catch (err: any) {
+      // Don't auto-generate tokens on session expiration
+      // Users must scan QR code again to get a fresh session
       setError(err.message);
     } finally {
       setLoading(false);

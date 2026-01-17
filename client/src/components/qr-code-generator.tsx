@@ -88,7 +88,7 @@ export default function QRCodeGenerator({
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ expiresIn: "2h" }),
+          body: JSON.stringify({ expiresIn: "2m" }),
         }
       );
 
@@ -98,6 +98,7 @@ export default function QRCodeGenerator({
 
       const data = await response.json();
       setQrToken(data.token);
+      setSelectedTableId(selectedTableId); // Keep track of the table ID
     } catch (error) {
       toast({
         title: "Error",
@@ -109,8 +110,8 @@ export default function QRCodeGenerator({
     }
   };
 
-  const qrValue = qrToken
-    ? `${window.location.origin}/menu/${restaurant.slug}?token=${qrToken}`
+  const qrValue = selectedTableId
+    ? `${window.location.origin}/menu/${restaurant.slug}?table=${selectedTableId}`
     : "";
 
   const handleCopyLink = async () => {
@@ -229,11 +230,11 @@ export default function QRCodeGenerator({
             className="w-full"
           >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Generate Secure QR Code
+            Generate QR Code
           </Button>
 
           {/* QR Code Display */}
-          {qrToken && (
+          {selectedTableId && qrValue && (
             <div className="text-center space-y-4">
               <div
                 id="qr-code-canvas"
