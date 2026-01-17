@@ -73,7 +73,7 @@ export default function CustomerMenu() {
       const data = await response.json();
       setSessionId(data.session_id);
       setTableInfo({
-        table_number: data.table_id ? 0 : 0, // Will be updated from menu data
+        table_number: data.table_number,
         name: data.table_name,
       });
 
@@ -237,11 +237,13 @@ export default function CustomerMenu() {
               </Badge>
             </div>
           )}
-          <p className="text-gray-600">Welcome in Our Restaurant</p>
           <p className="text-gray-600">
-            <a href="https://facebook.com">Facebook🍳</a>
-            <a href="https://instagram.com">Instagram📸</a>
-            <a href="https://twitter.com">Twitter🐦</a>
+            Place Your Order. Wait for it to be served!
+          </p>
+          <p className="text-gray-600">
+            <a href="https://facebook.com">Facebook</a>
+            <a href="https://instagram.com">Instagram</a>
+            <a href="https://twitter.com">Twitter</a>
           </p>
         </div>
 

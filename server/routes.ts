@@ -86,12 +86,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get restaurant and menu
       const { data: restaurant, error: restError } = await supabase
         .from('restaurants')
-        .select('id, name, slug')
+        .select('id, name, slug, image_url')
         .eq('id', session.restaurant_id)
         .single();
 
       if (restError || !restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
+      }
+
+      // Get table info
+      const { data: table, error: tableError } = await supabase
+        .from('tables')
+        .select('table_number, name')
+        .eq('id', session.table_id)
+        .single();
+
+      if (tableError || !table) {
+        return res.status(404).json({ error: 'Table not found' });
       }
 
       const { data: menu, error: menuError } = await supabase
@@ -111,7 +122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         session_id: session.session_id,
         restaurant,
         menu,
-        table_id: session.table_id
+        table_number: table.table_number,
+        table_name: table.name
       });
     } catch (err) {
       res.status(500).json({ error: 'Internal server error' });
