@@ -127,7 +127,7 @@ export default function AdminDashboard() {
   const [tick, setTick] = useState(Date.now());
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [reportDate, setReportDate] = useState<string>(() =>
-    new Date().toISOString().slice(0, 10)
+    new Date().toISOString().slice(0, 10),
   );
   const { toast } = useToast();
   const restImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -142,13 +142,13 @@ export default function AdminDashboard() {
   } | null>(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   const [profileName, setProfileName] = useState<string>(
-    user?.user_metadata?.full_name ?? ""
+    user?.user_metadata?.full_name ?? "",
   );
   const [profilePhone, setProfilePhone] = useState<string>(
-    user?.user_metadata?.phone ?? ""
+    user?.user_metadata?.phone ?? "",
   );
   const [profileOther, setProfileOther] = useState<string>(
-    user?.user_metadata?.other ?? ""
+    user?.user_metadata?.other ?? "",
   );
 
   useEffect(() => {
@@ -175,7 +175,7 @@ export default function AdminDashboard() {
     try {
       localStorage.setItem(
         "tablesPanelOpen",
-        showTablesPanel ? "true" : "false"
+        showTablesPanel ? "true" : "false",
       );
     } catch (e) {}
   }, [showTablesPanel]);
@@ -185,7 +185,7 @@ export default function AdminDashboard() {
     try {
       localStorage.setItem(
         "sessionsPanelOpen",
-        showSessionsPanel ? "true" : "false"
+        showSessionsPanel ? "true" : "false",
       );
     } catch (e) {}
   }, [showSessionsPanel]);
@@ -231,7 +231,7 @@ export default function AdminDashboard() {
       'a, button, input, textarea, select, [tabindex]:not([tabindex="-1"])';
     const focusable = el
       ? Array.from(el.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-          (f) => !f.hasAttribute("disabled")
+          (f) => !f.hasAttribute("disabled"),
         )
       : [];
     const first = focusable[0];
@@ -296,7 +296,7 @@ export default function AdminDashboard() {
 
   const todaysOrders = useMemo(
     () => orders.filter((o) => isToday(o.created_at)),
-    [orders, tick]
+    [orders, tick],
   );
 
   // total sales for today (sum of completed orders only)
@@ -339,7 +339,7 @@ export default function AdminDashboard() {
               loadOrders();
               ordersReloadDebounceRef.current = null;
             }, 800);
-          }
+          },
         )
         .subscribe();
 
@@ -473,7 +473,7 @@ export default function AdminDashboard() {
       const rows = filtered.map((o) => {
         const itemsStr = o.items
           .map(
-            (i) => `${i.quantity}x ${i.name} (Rs${Number(i.price).toFixed(2)})`
+            (i) => `${i.quantity}x ${i.name} (Rs${Number(i.price).toFixed(2)})`,
           )
           .join(" | ");
         return [
@@ -488,7 +488,7 @@ export default function AdminDashboard() {
 
       const csv = [header, ...rows]
         .map((r) =>
-          r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")
+          r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","),
         )
         .join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -518,7 +518,7 @@ export default function AdminDashboard() {
     if (!selectedRestaurant) return;
     try {
       const response = await fetch(
-        `/api/restaurants/${selectedRestaurant.id}/orders`
+        `/api/restaurants/${selectedRestaurant.id}/orders`,
       );
       if (!response.ok) throw new Error("Failed to load orders");
 
@@ -539,7 +539,7 @@ export default function AdminDashboard() {
             })) || [],
           created_at: order.created_at,
           suggestion: order.suggestion,
-        }))
+        })),
       );
     } catch (error: any) {
       toast({
@@ -554,7 +554,7 @@ export default function AdminDashboard() {
     if (!selectedRestaurant) return;
     try {
       const response = await fetch(
-        `/api/restaurants/${selectedRestaurant.id}/sessions`
+        `/api/restaurants/${selectedRestaurant.id}/sessions`,
       );
       if (!response.ok) throw new Error("Failed to load sessions");
 
@@ -648,7 +648,7 @@ export default function AdminDashboard() {
       toast({
         title: "File too large",
         description: `Image must be smaller than 200KB. Your file is ${Math.round(
-          file.size / 1024
+          file.size / 1024,
         )}KB.`,
         variant: "destructive",
       });
@@ -701,7 +701,7 @@ export default function AdminDashboard() {
       toast({
         title: "File too large",
         description: `Image must be smaller than ${Math.round(
-          maxSize / 1024
+          maxSize / 1024,
         )}KB.`,
         variant: "destructive",
       });
@@ -904,7 +904,7 @@ export default function AdminDashboard() {
   const updateOrderStatus = async (
     orderId: string,
     status: Order["status"],
-    showUndo: boolean = true
+    showUndo: boolean = true,
   ) => {
     try {
       const existingOrder = orders.find((o) => o.id === orderId);
@@ -935,7 +935,7 @@ export default function AdminDashboard() {
 
       // Update local orders state optimistically instead of reloading entire list
       setOrders((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status } : o))
+        prev.map((o) => (o.id === orderId ? { ...o, status } : o)),
       );
 
       // show success toast with optional Undo action
@@ -1001,7 +1001,7 @@ export default function AdminDashboard() {
 
   const updateMenuItem = async (
     itemId: string,
-    updatedData: Partial<MenuItem>
+    updatedData: Partial<MenuItem>,
   ) => {
     try {
       const { error } = await supabase
@@ -1014,8 +1014,8 @@ export default function AdminDashboard() {
       // Update local state
       setMenuItems((prev) =>
         prev.map((item) =>
-          item.id === itemId ? { ...item, ...updatedData } : item
-        )
+          item.id === itemId ? { ...item, ...updatedData } : item,
+        ),
       );
       setEditingItem(null);
 
@@ -1185,7 +1185,7 @@ export default function AdminDashboard() {
                               <Calendar className="inline mr-1 h-3 w-3" />
                               Created{" "}
                               {new Date(
-                                restaurant.createdAt || ""
+                                restaurant.createdAt || "",
                               ).toLocaleDateString()}
                             </span>
                           </div>
@@ -1326,14 +1326,14 @@ export default function AdminDashboard() {
                                     if (error) throw error;
 
                                     setSelectedRestaurant((prev) =>
-                                      prev ? { ...prev, imageUrl: url } : prev
+                                      prev ? { ...prev, imageUrl: url } : prev,
                                     );
                                     setRestaurants((prev) =>
                                       prev.map((r) =>
                                         r.id === selectedRestaurant.id
                                           ? { ...r, imageUrl: url }
-                                          : r
-                                      )
+                                          : r,
+                                      ),
                                     );
                                     toast({
                                       title: "Success",
@@ -1407,7 +1407,7 @@ export default function AdminDashboard() {
                                   todaysOrders.filter(
                                     (o) =>
                                       o.status !== "completed" &&
-                                      o.status !== "cancelled"
+                                      o.status !== "cancelled",
                                   ).length
                                 }
                               </strong>
@@ -1540,12 +1540,7 @@ export default function AdminDashboard() {
                           variant="outline"
                           asChild
                           data-testid="link-view-public"
-                        >
-                          <Link to={`/menu/${selectedRestaurant.slug}`}>
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            View Public Menu
-                          </Link>
-                        </Button>
+                        ></Button>
 
                         <div className="flex flex-col">
                           <QRCodeGenerator
@@ -1593,7 +1588,7 @@ export default function AdminDashboard() {
                             .filter(
                               (order) =>
                                 order.status !== "completed" &&
-                                order.status !== "cancelled"
+                                order.status !== "cancelled",
                             )
                             .map((order) => (
                               <div
@@ -1606,7 +1601,7 @@ export default function AdminDashboard() {
                                     variant="outline"
                                     onClick={() => {
                                       setSuggestionText(
-                                        order.suggestion ?? null
+                                        order.suggestion ?? null,
                                       );
                                       setSuggestionDialogOpen(true);
                                     }}
@@ -1628,8 +1623,8 @@ export default function AdminDashboard() {
                                           order.status === "pending"
                                             ? "secondary"
                                             : order.status === "preparing"
-                                            ? "default"
-                                            : "default"
+                                              ? "default"
+                                              : "default"
                                         }
                                       >
                                         {order.status}
@@ -1638,7 +1633,7 @@ export default function AdminDashboard() {
                                     <p className="text-sm text-gray-500 mt-1">
                                       Ordered at{" "}
                                       {new Date(
-                                        order.created_at
+                                        order.created_at,
                                       ).toLocaleTimeString()}
                                     </p>
                                   </div>
@@ -1689,7 +1684,7 @@ export default function AdminDashboard() {
                                           onConfirm: async () =>
                                             await updateOrderStatus(
                                               order.id,
-                                              "cancelled"
+                                              "cancelled",
                                             ),
                                         });
                                         setConfirmOpen(true);
@@ -1724,7 +1719,7 @@ export default function AdminDashboard() {
                                           onConfirm: async () =>
                                             await updateOrderStatus(
                                               order.id,
-                                              "cancelled"
+                                              "cancelled",
                                             ),
                                         });
                                         setConfirmOpen(true);
@@ -1741,7 +1736,7 @@ export default function AdminDashboard() {
                           {orders.filter(
                             (order) =>
                               order.status !== "completed" &&
-                              order.status !== "cancelled"
+                              order.status !== "cancelled",
                           ).length === 0 && (
                             <div className="text-center py-6 text-gray-500">
                               No active orders
@@ -1766,7 +1761,7 @@ export default function AdminDashboard() {
                             .filter(
                               (order) =>
                                 order.status === "completed" ||
-                                order.status === "cancelled"
+                                order.status === "cancelled",
                             )
                             .slice(0, showAllRecent ? undefined : 4)
                             .map((order) => (
@@ -1794,7 +1789,7 @@ export default function AdminDashboard() {
                                     </div>
                                     <p className="text-sm text-gray-500 mt-1">
                                       {new Date(
-                                        order.created_at
+                                        order.created_at,
                                       ).toLocaleString()}
                                     </p>
                                   </div>
@@ -1830,7 +1825,7 @@ export default function AdminDashboard() {
                           {todaysOrders.filter(
                             (order) =>
                               order.status === "completed" ||
-                              order.status === "cancelled"
+                              order.status === "cancelled",
                           ).length > 4 && (
                             <div className="text-center mt-2">
                               <Button
@@ -1846,7 +1841,7 @@ export default function AdminDashboard() {
                           {orders.filter(
                             (order) =>
                               order.status === "completed" ||
-                              order.status === "cancelled"
+                              order.status === "cancelled",
                           ).length === 0 && (
                             <div className="text-center py-6 text-gray-500">
                               No completed orders
@@ -2173,7 +2168,7 @@ export default function AdminDashboard() {
                                     <span className="text-xs text-gray-500">
                                       Added{" "}
                                       {new Date(
-                                        item.createdAt || ""
+                                        item.createdAt || "",
                                       ).toLocaleDateString()}
                                     </span>
                                   </div>
@@ -2211,7 +2206,7 @@ export default function AdminDashboard() {
                                         setEditingItem((prev) =>
                                           prev
                                             ? { ...prev, name: e.target.value }
-                                            : null
+                                            : null,
                                         )
                                       }
                                     />
@@ -2226,7 +2221,7 @@ export default function AdminDashboard() {
                                         setEditingItem((prev) =>
                                           prev
                                             ? { ...prev, price: e.target.value }
-                                            : null
+                                            : null,
                                         )
                                       }
                                     />
@@ -2242,7 +2237,7 @@ export default function AdminDashboard() {
                                                 ...prev,
                                                 description: e.target.value,
                                               }
-                                            : null
+                                            : null,
                                         )
                                       }
                                     />
@@ -2258,7 +2253,7 @@ export default function AdminDashboard() {
                                                 ...prev,
                                                 category: e.target.value,
                                               }
-                                            : null
+                                            : null,
                                         )
                                       }
                                     />
@@ -2275,7 +2270,7 @@ export default function AdminDashboard() {
                                                   ...prev,
                                                   available: e.target.checked,
                                                 }
-                                              : null
+                                              : null,
                                           )
                                         }
                                       />
@@ -2548,13 +2543,13 @@ export default function AdminDashboard() {
                                   <p className="text-sm text-gray-500 mt-1">
                                     Started at{" "}
                                     {new Date(
-                                      session.created_at
+                                      session.created_at,
                                     ).toLocaleTimeString()}
                                   </p>
                                   <p className="text-sm text-gray-500">
                                     Last activity:{" "}
                                     {new Date(
-                                      session.last_activity
+                                      session.last_activity,
                                     ).toLocaleTimeString()}
                                   </p>
                                 </div>
@@ -2573,11 +2568,11 @@ export default function AdminDashboard() {
                                             `/api/sessions/${session.session_id}/close`,
                                             {
                                               method: "POST",
-                                            }
+                                            },
                                           );
                                           if (!response.ok)
                                             throw new Error(
-                                              "Failed to close session"
+                                              "Failed to close session",
                                             );
                                           loadSessions();
                                           toast({
