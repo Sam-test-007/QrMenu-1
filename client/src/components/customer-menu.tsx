@@ -32,7 +32,7 @@ export default function CustomerMenu() {
   const [menu, setMenu] = useState<MenuData>({ name: "", items: [] });
   const [loading, setLoading] = useState(true);
   const [restaurantImageUrl, setRestaurantImageUrl] = useState<string | null>(
-    null
+    null,
   );
   const [suggestion, setSuggestion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,12 +174,12 @@ export default function CustomerMenu() {
       menu.items
         .filter((item) => item.quantity > 0)
         .reduce((sum, item) => sum + Number(item.price) * item.quantity, 0),
-    [menu.items]
+    [menu.items],
   );
 
   const itemsInOrder = useMemo(
     () => menu.items.filter((item) => item.quantity > 0),
-    [menu.items]
+    [menu.items],
   );
 
   const filteredItems = useMemo(() => {
@@ -196,7 +196,8 @@ export default function CustomerMenu() {
     return bySearch.filter(
       (item) =>
         (item as any).category === selectedCategory ||
-        ((item as any).category == null && selectedCategory === "Uncategorized")
+        ((item as any).category == null &&
+          selectedCategory === "Uncategorized"),
     );
   }, [menu.items, searchQuery, selectedCategory]);
   // Add this after the existing itemsInOrder useMemo
@@ -266,7 +267,7 @@ export default function CustomerMenu() {
   }
 
   const categories = Array.from(
-    new Set(menu.items.map((i) => (i as any).category || "Uncategorized"))
+    new Set(menu.items.map((i) => (i as any).category || "Uncategorized")),
   );
 
   return (
@@ -308,8 +309,8 @@ export default function CustomerMenu() {
             Place Your Order. Wait for it to be served!
           </p>
           <p className="text-gray-600">
-            <a href="https://facebook.com">Facebook</a>
-            <a href="https://instagram.com">Instagram</a>
+            <a href="https://facebook.com">Facebook </a>
+            <a href="https://instagram.com">Instagram </a>
             <a href="https://twitter.com">Twitter</a>
           </p>
         </div>
@@ -374,7 +375,7 @@ export default function CustomerMenu() {
               <div className="divide-y divide-gray-200">
                 {filteredItems.map((item) => {
                   const originalIndex = menu.items.findIndex(
-                    (i) => i.id === item.id
+                    (i) => i.id === item.id,
                   );
                   return (
                     <div
@@ -429,7 +430,7 @@ export default function CustomerMenu() {
                                 onClick={() =>
                                   updateQuantity(
                                     originalIndex,
-                                    item.quantity - 1
+                                    item.quantity - 1,
                                   )
                                 }
                                 data-testid={`button-decrease-${item.id}`}
@@ -449,7 +450,7 @@ export default function CustomerMenu() {
                                 onClick={() =>
                                   updateQuantity(
                                     originalIndex,
-                                    item.quantity + 1
+                                    item.quantity + 1,
                                   )
                                 }
                                 data-testid={`button-increase-${item.id}`}

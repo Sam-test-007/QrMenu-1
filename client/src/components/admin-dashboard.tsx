@@ -569,37 +569,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const loadMoreOlder = async () => {
-    if (!selectedRestaurant || !hasMoreOlder || loadingOlder) return;
-    setLoadingOlder(true);
-    try {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      const startIso = startOfDay.toISOString();
-      const start = olderPage * pageSize;
-      const end = (olderPage + 1) * pageSize - 1;
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("restaurant_id", selectedRestaurant.id)
-        .lt("created_at", startIso)
-        .order("created_at", { ascending: false })
-        .range(start, end);
-      if (error) throw error;
-      setOrders((prev) => [...prev, ...(data || [])]);
-      setOlderPage((p) => p + 1);
-      setHasMoreOlder((data || []).length === pageSize);
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: "Failed to load older orders",
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingOlder(false);
-    }
-  };
-
   const createRestaurant = async () => {
     if (!newRestaurant.name || !newRestaurant.slug) {
       toast({
@@ -1884,19 +1853,6 @@ export default function AdminDashboard() {
                     </Card>
                   </section>
                 </div>
-
-                {hasMoreOlder && (
-                  <div className="text-center mt-4">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={loadMoreOlder}
-                      disabled={loadingOlder}
-                    >
-                      {loadingOlder ? "Loading..." : "Load older orders"}
-                    </Button>
-                  </div>
-                )}
 
                 {/* Menu Panel Toggle + Panel (moved to left side) */}
                 {/* Toggle button */}
