@@ -48,7 +48,7 @@ yarn-error.log*
 # TypeScript cache
 *.tsbuildinfo
 vite.config.ts.*
-
+supabase_schema.sql
 # Test coverage
 /coverage
 
