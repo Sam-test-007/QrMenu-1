@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useParams } from "wouter";
 import { supabase, currency } from "@/lib/supabase";
+import { apiUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -69,7 +70,7 @@ export default function CustomerMenu() {
     const refreshInterval = setInterval(async () => {
       try {
         // Check if session is still valid
-        const response = await fetch("/api/validate-token", {
+        const response = await fetch(apiUrl("/api/validate-token"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ token }),
@@ -90,11 +91,14 @@ export default function CustomerMenu() {
 
   const generateFreshTokenForTable = async (tableId: string) => {
     try {
-      const response = await fetch(`/api/tables/${tableId}/generate-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expiresIn: "2m" }),
-      });
+      const response = await fetch(
+        apiUrl(`/api/tables/${tableId}/generate-token`),
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expiresIn: "2m" }),
+        },
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -119,7 +123,7 @@ export default function CustomerMenu() {
   };
 
   const validateToken = async (tokenToValidate: string) => {
-    const response = await fetch("/api/validate-token", {
+    const response = await fetch(apiUrl("/api/validate-token"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: tokenToValidate }),
@@ -214,7 +218,7 @@ export default function CustomerMenu() {
         suggestion: suggestion.trim() || null,
       };
 
-      const response = await fetch("/api/orders", {
+      const response = await fetch(apiUrl("/api/orders"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(orderData),
