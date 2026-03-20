@@ -12,8 +12,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 app.post('/api/tables/:tableId/generate-token', async (req, res) => {
   try {
     const { tableId } = req.params;
-    const { expiresIn = '2m' } = req.body; // default 2 minutes for testing
-    
+    const expiresIn = '1h'; // fixed to 1 hour
+
 
     // Verify table exists
     const { data: table, error } = await supabase
@@ -27,7 +27,7 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
     }
 
     const issuedAt = Math.floor(Date.now() / 1000);
-    const expiresAt = issuedAt + (expiresIn === '2h' ? 7200 : expiresIn === '1h' ? 3600 : expiresIn === '2m' ? 120 : 120); // 2h, 1h, or 2m, default 2m
+    const expiresAt = issuedAt + 3600;
     
 
     const token = jwt.sign(
@@ -55,7 +55,7 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
     res.json({
       token,
       session_id: session,
-      expires_in: expiresIn === '2h' ? 7200 : expiresIn === '1h' ? 3600 : expiresIn === '2m' ? 120 : 120
+      expires_in: 3600
       
     });
   } catch (err) {
