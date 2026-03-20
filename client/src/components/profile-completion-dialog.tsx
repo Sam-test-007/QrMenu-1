@@ -60,11 +60,26 @@ export default function ProfileCompletionDialog({
 
     setLoading(true);
     try {
-      const { error } = await supabase.from("profiles").upsert({
-        id: userId,
+      const { data: existingProfile, error: existingError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      if (existingError) throw existingError;
+
+      const profilePayload = {
         full_name: fullName.trim(),
         phone_number: phoneNumber.trim(),
-      });
+      };
+
+      const { error } = existingProfile
+        ? await supabase.from("profiles").update(profilePayload).eq("id", userId)
+        : await supabase.from("profiles").insert({
+            id: userId,
+            created_at: new Date().toISOString(),
+            ...profilePayload,
+          });
 
       if (error) throw error;
 
