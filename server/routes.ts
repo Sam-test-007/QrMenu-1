@@ -202,7 +202,11 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
           return res.status(400).json({ error: `Invalid item: ${item.menu_item_id}` });
         }
 
-        const quantity = item.quantity || 1;
+        const quantityRaw = item.quantity ?? 1;
+        const quantity = typeof quantityRaw === "string" ? Number(quantityRaw) : quantityRaw;
+        if (!Number.isInteger(quantity) || quantity < 1) {
+          return res.status(400).json({ error: `Invalid quantity for item: ${item.menu_item_id}` });
+        }
         const price = menuItem.price;
         total += price * quantity;
 

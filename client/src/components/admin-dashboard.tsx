@@ -1089,25 +1089,62 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Profile</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
-            <div className="flex justify-between items-center mt-4">
-              <div className="space-x-2">
-                <a href="mailto:sales@qrmenu.example?subject=Contact%20Sales%20-%20QR%20Menu">
-                  <Button variant="ghost">Contact Sales</Button>
-                </a>
-                <a href="mailto:bugs@qrmenu.example?subject=Bug%20Report%20-%20QR%20Menu">
-                  <Button variant="ghost">Report Bug</Button>
-                </a>
+          <div className="grid gap-4">
+            <div className="grid gap-3">
+              <div className="grid gap-2">
+                <Label htmlFor="profile-name">Full name</Label>
+                <Input
+                  id="profile-name"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="e.g. Alex Rivera"
+                />
               </div>
-              <div className="space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setProfileDialogOpen(false)}
-                >
-                  Close
-                </Button>
-                <Button onClick={updateUserProfile}>Save</Button>
+              <div className="grid gap-2">
+                <Label htmlFor="profile-email">Email</Label>
+                <Input
+                  id="profile-email"
+                  value={user?.email ?? ""}
+                  disabled
+                />
               </div>
+              <div className="grid gap-2">
+                <Label htmlFor="profile-phone">Phone</Label>
+                <Input
+                  id="profile-phone"
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  placeholder="e.g. +1 555 234 5678"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="profile-role">Role or notes</Label>
+                <Input
+                  id="profile-role"
+                  value={profileOther}
+                  onChange={(e) => setProfileOther(e.target.value)}
+                  placeholder="Owner, manager, or anything you'd like us to know"
+                />
+              </div>
+            </div>
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setProfileName(user?.user_metadata?.full_name ?? "");
+                  setProfilePhone(user?.user_metadata?.phone ?? "");
+                  setProfileOther(user?.user_metadata?.other ?? "");
+                }}
+              >
+                Reset
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => setProfileDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button onClick={updateUserProfile}>Save Changes</Button>
             </div>
           </div>
         </DialogContent>
