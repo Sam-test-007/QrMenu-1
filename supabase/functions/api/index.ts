@@ -1,5 +1,5 @@
-import { create, verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.56.0";
+import { create, verify } from "djwt";
+import { createClient } from "supabase";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,7 +39,7 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { persistSession: false },
 });
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
       }
 
       const enrichedOrders = await Promise.all(
-        (orders || []).map(async (order) => {
+        (orders || []).map(async (order: any) => {
           const { data: session, error: sessionError } = await supabase
             .from("table_sessions")
             .select("table_id, tables(table_number, name)")
