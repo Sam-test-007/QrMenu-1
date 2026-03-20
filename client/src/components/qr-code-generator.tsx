@@ -1,36 +1,122 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { QrCode, Download, Copy } from "lucide-react";
+import { QrCode, Download, Copy, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 import type { Restaurant, MenuItem } from "@shared/schema";
+
+interface Table {
+  id: string;
+  table_number: number;
+  name?: string;
+  active: boolean;
+}
 
 interface QRCodeGeneratorProps {
   restaurant: Restaurant;
   menuItems: MenuItem[];
 }
 
-export default function QRCodeGenerator({ restaurant, menuItems }: QRCodeGeneratorProps) {
+export default function QRCodeGenerator({
+  restaurant,
+  menuItems,
+}: QRCodeGeneratorProps) {
   const [open, setOpen] = useState(false);
-  const [tableNumber, setTableNumber] = useState("");
+  const [tables, setTables] = useState<Table[]>([]);
+  const [selectedTableId, setSelectedTableId] = useState<string>("");
+  const [qrToken, setQrToken] = useState<string>("");
+  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
-  const generateQRLink = (tableNum?: string) => {
-    let baseUrl = `${window.location.origin}/menu/${encodeURIComponent(restaurant.slug)}`;
-    if (tableNum && tableNum.trim()) {
-      baseUrl += `?table=${encodeURIComponent(tableNum.trim())}`;
+  useEffect(() => {
+    if (open) {
+      fetchTables();
     }
-    return baseUrl;
+  }, [open]);
+
+  const fetchTables = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("tables")
+        .select("id, table_number, name, active")
+        .eq("restaurant_id", restaurant.id)
+        .eq("active", true)
+        .order("table_number");
+
+      if (error) throw error;
+      setTables(data || []);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to load tables",
+        variant: "destructive",
+      });
+    }
   };
 
-  const qrLink = generateQRLink(tableNumber);
+  const generateSecureQR = async () => {
+    if (!selectedTableId) {
+      toast({
+        title: "Error",
+        description: "Please select a table",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(
+        `/api/tables/${selectedTableId}/generate-token`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ expiresIn: "2m" }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to generate token");
+      }
+
+      const data = await response.json();
+      setQrToken(data.token);
+      setSelectedTableId(selectedTableId); // Keep track of the table ID
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate secure QR code",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const qrValue = selectedTableId
+    ? `${window.location.origin}/menu/${restaurant.slug}?table=${selectedTableId}`
+    : "";
 
   const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(qrLink);
+      await navigator.clipboard.writeText(qrValue);
       toast({
         title: "Success",
         description: "Link copied to clipboard!",
@@ -45,133 +131,159 @@ export default function QRCodeGenerator({ restaurant, menuItems }: QRCodeGenerat
   };
 
   const handleDownloadQR = () => {
-    const canvas = document.querySelector('#qr-code-canvas canvas') as HTMLCanvasElement;
+    const canvas = document.querySelector(
+      "#qr-code-canvas canvas"
+    ) as HTMLCanvasElement;
     if (!canvas) return;
 
+    const selectedTable = tables.find((t) => t.id === selectedTableId);
+    const tableDisplay = selectedTable
+      ? selectedTable.name || `Table ${selectedTable.table_number}`
+      : "Menu";
+
     // Create an offscreen canvas to compose QR + text
-    const qrSize = canvas.width; // includes margin
+    const qrSize = canvas.width;
     const padding = 24;
-    const textLines = [] as string[];
-    if (restaurant.name) textLines.push(restaurant.name);
-    if (tableNumber && tableNumber.trim()) textLines.push(`Table ${tableNumber.trim()}`);
+    const textLines = [restaurant.name, tableDisplay, "Scan to order"];
 
     const lineHeight = 20;
-    const textAreaHeight = textLines.length > 0 ? (textLines.length * lineHeight + padding) : 0;
+    const textAreaHeight = textLines.length * lineHeight + padding;
 
     const outWidth = qrSize + padding * 2;
     const outHeight = qrSize + textAreaHeight + padding * 2;
 
-    const outCanvas = document.createElement('canvas');
+    const outCanvas = document.createElement("canvas");
     outCanvas.width = outWidth;
     outCanvas.height = outHeight;
-    const ctx = outCanvas.getContext('2d');
+    const ctx = outCanvas.getContext("2d");
     if (!ctx) return;
 
     // fill background
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, outWidth, outHeight);
 
-    // draw QR centered horizontally, leaving top padding
+    // draw QR
     const qrX = padding;
     const qrY = padding;
-
-    // draw existing QR canvas into the new canvas
     ctx.drawImage(canvas, qrX, qrY, qrSize, qrSize);
 
-    // draw text centered below QR
-    if (textLines.length > 0) {
-      ctx.fillStyle = '#111827';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'top';
-      const fontSize = 16;
-      ctx.font = `bold ${fontSize}px Inter, Arial, sans-serif`;
-      const centerX = outWidth / 2;
-      let ty = qrY + qrSize + 12;
-      for (const line of textLines) {
-        ctx.fillText(line, centerX, ty);
-        ty += lineHeight;
-      }
+    // draw text
+    ctx.fillStyle = "#111827";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.font = `bold 16px Inter, Arial, sans-serif`;
+    const centerX = outWidth / 2;
+    let ty = qrY + qrSize + 12;
+    for (const line of textLines) {
+      ctx.fillText(line, centerX, ty);
+      ty += lineHeight;
     }
 
-    const link = document.createElement('a');
-    const filename = tableNumber && tableNumber.trim()
-      ? `${restaurant.slug}-table-${tableNumber.trim()}-qr.png`
+    const link = document.createElement("a");
+    const filename = selectedTable
+      ? `${restaurant.slug}-table-${selectedTable.table_number}-qr.png`
       : `${restaurant.slug}-qr-menu.png`;
     link.download = filename;
-    link.href = outCanvas.toDataURL('image/png');
+    link.href = outCanvas.toDataURL("image/png");
     link.click();
   };
 
-  
+  const selectedTable = tables.find((t) => t.id === selectedTableId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button data-testid="button-generate-qr">
           <QrCode className="mr-2 h-4 w-4" />
-          Generate QR Code
+          Generate Secure QR Code
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Generate QR Code</DialogTitle>
+          <DialogTitle>Generate Secure QR Code</DialogTitle>
         </DialogHeader>
         <div className="space-y-6">
-          {/* Table Number Input */}
+          {/* Table Selection */}
           <div className="space-y-2">
-            <Label htmlFor="table-number">Table Number (Optional)</Label>
-            <Input
-              id="table-number"
-              placeholder="e.g., 1, A1, Table 5"
-              value={tableNumber}
-              onChange={(e) => setTableNumber(e.target.value)}
-              data-testid="input-table-number"
-            />
+            <Label htmlFor="table-select">Select Table</Label>
+            <Select value={selectedTableId} onValueChange={setSelectedTableId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a table" />
+              </SelectTrigger>
+              <SelectContent>
+                {tables.map((table) => (
+                  <SelectItem key={table.id} value={table.id}>
+                    {table.name || `Table ${table.table_number}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <p className="text-xs text-gray-500">
-              Leave empty for general menu QR code, or enter a table number for table-specific QR codes
+              Each table needs its own unique QR code for secure ordering
             </p>
           </div>
 
+          {/* Generate Button */}
+          <Button
+            onClick={generateSecureQR}
+            disabled={!selectedTableId || loading}
+            className="w-full"
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Generate QR Code
+          </Button>
+
           {/* QR Code Display */}
-          <div className="text-center space-y-4">
-            <div 
-              id="qr-code-canvas" 
-              className="bg-white p-4 rounded-xl border-2 border-gray-200 inline-block"
-              data-testid="qr-code-display"
-            >
-              <QRCodeCanvas
-                value={qrLink}
-                size={192}
-                level="M"
-                includeMargin={true}
-              />
+          {selectedTableId && qrValue && (
+            <div className="text-center space-y-4">
+              <div
+                id="qr-code-canvas"
+                className="bg-white p-4 rounded-xl border-2 border-gray-200 inline-block"
+                data-testid="qr-code-display"
+              >
+                <QRCodeCanvas
+                  value={qrValue}
+                  size={192}
+                  level="M"
+                  includeMargin={true}
+                />
+              </div>
+
+              <div>
+                <h4 className="text-xl font-semibold text-gray-900 mb-2">
+                  {selectedTable
+                    ? selectedTable.name ||
+                      `Table ${selectedTable.table_number}`
+                    : "Menu"}{" "}
+                  QR Code
+                </h4>
+                <p className="text-gray-600 mb-4">
+                  Customers at this table can scan this QR code to place secure
+                  orders
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Button
+                  onClick={handleDownloadQR}
+                  className="flex-1"
+                  data-testid="button-download-qr"
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Download QR Code
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleCopyLink}
+                  className="flex-1"
+                  data-testid="button-copy-link"
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy Link
+                </Button>
+              </div>
             </div>
-              {/* Live composed preview (downloaded image preview) */}
-              
-            
-            <div>
-              <h4 className="text-xl font-semibold text-gray-900 mb-2">
-                {tableNumber ? `Table ${tableNumber} QR Code` : "Menu QR Code"}
-              </h4>
-              <p className="text-gray-600 mb-4">
-                {tableNumber 
-                  ? `Customers at table ${tableNumber} can scan this QR code to view your menu`
-                  : "Customers can scan this QR code to view your menu instantly"
-                }
-              </p>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-3">
-              <Button onClick={handleDownloadQR} className="flex-1" data-testid="button-download-qr">
-                <Download className="mr-2 h-4 w-4" />
-                Download QR Code
-              </Button>
-              <Button variant="outline" onClick={handleCopyLink} className="flex-1" data-testid="button-copy-link">
-                <Copy className="mr-2 h-4 w-4" />
-                Copy Link
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

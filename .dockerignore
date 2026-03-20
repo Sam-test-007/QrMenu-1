@@ -1,0 +1,75 @@
+# Node.js dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+out/
+
+# Local development and state
+.local/
+local/
+
+# IDE/editor settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Version control
+.git/
+.gitignore
+.svn/
+.hg/
+
+# Environment and secrets
+.env*
+*.env
+*.pem
+*.key
+*.crt
+
+# Temporary and debug files
+tmp/
+temp/
+*.tmp
+*.log
+npm-debug.log
+yarn-debug.log
+
+# Documentation
+*.md
+README*
+DEPLOYMENT_INSTRUCTIONS.md
+
+docs/
+
+# Project-specific config and artifacts
+.config/
+.replit
+
+# Test and jobs directories (empty or not used in build)
+test/
+tests/
+scripts/
+server/jobs/
+server/lib/
+db/migrations/
+
+# Miscellaneous
+*.bin
+
+# Ignore attached assets (if not needed in build)
+attached_assets/
+
+# Ignore Semgrep rules (large, not needed in build)
+.config/.semgrep/
+
+# Ignore postcss config if not used in build
+postcss.config.js
+
+# Ignore Drizzle config if not used in build
+drizzle.config.ts
+
+# Ignore components.json if not used in build
+components.json

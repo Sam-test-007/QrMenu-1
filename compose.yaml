@@ -1,0 +1,21 @@
+services:
+  typescript-app:
+    # Main application service (TypeScript, npm)
+    build:
+      context: .
+    container_name: typescript-app
+    restart: unless-stopped
+    init: true
+    # Expose the port defined in Dockerfile (3000)
+    ports:
+      - "3000:3000"
+    # env_file: ./.env  # Uncomment if .env file exists
+    # Add depends_on here if you add external services below
+    # networks: [appnet]  # Uncomment if you add more services/networks
+
+# No external services (databases, caches, etc.) detected in the project structure or documentation.
+# If you add a database or other dependency, add it here and update depends_on/networks as needed.
+
+# No volumes section needed as there are no persistent data services.
+
+# No custom networks defined as only a single service is present.

@@ -16,6 +16,11 @@
 - **Sales Overview:** Display of total sales in the restaurant header, aggregating order totals.
 - **Bug Fixes:** Resolved JSX parsing errors and improved overall stability.
 
+**Files Modified**
+
+- [client/src/components/admin-dashboard.tsx](client/src/components/admin-dashboard.tsx) — Enhanced the menu for responsiveness, added onboarding features, a focus trap, daily order counter, total sales display, and fixed JSX issues.
+- [client/src/components/qr-code-generator.tsx](client/src/components/qr-code-generator.tsx) — Implemented QR code composition for download, integrating restaurant name and table number.
+
 **Local Setup & Run**
 
 To set up the project locally, install the necessary dependencies and start the development server:

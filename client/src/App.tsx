@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/hooks/use-auth";
 import Landing from "@/pages/landing";
 import Auth from "@/pages/auth";
+import ResetPassword from "@/pages/reset-password";
 import Dashboard from "@/pages/dashboard";
 import Menu from "@/pages/menu";
 import NotFound from "@/pages/not-found";
@@ -28,7 +29,14 @@ function App() {
       <AuthProvider>
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <Switch>
+            <Route path="/" component={Landing} />
+            <Route path="/auth" component={Auth} />
+            <Route path="/reset-password" component={ResetPassword} />
+            <Route path="/dashboard" component={Dashboard} />
+            <Route path="/menu/:slug" component={Menu} />
+            <Route component={NotFound} />
+          </Switch>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>

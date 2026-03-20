@@ -7,7 +7,16 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn("Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment variables");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+  },
+});
+
+// Expose a flag so UI can show a helpful error if env vars are missing at runtime
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
 export function currency(n: number) {
   return Number(n).toLocaleString(undefined, { 

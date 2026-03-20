@@ -39,6 +39,7 @@ export class MemStorage implements IStorage {
     const profile: Profile = { 
       id,
       fullName: insertProfile.fullName ?? null,
+      phoneNumber: insertProfile.phoneNumber ?? null,
       createdAt: new Date()
     };
     this.profiles.set(id, profile);
@@ -62,6 +63,7 @@ export class MemStorage implements IStorage {
       ownerId: insertRestaurant.ownerId ?? null,
       name: insertRestaurant.name,
       slug: insertRestaurant.slug,
+      imageUrl: insertRestaurant.imageUrl ?? null,
       createdAt: new Date()
     };
     this.restaurants.set(id, restaurant);
@@ -80,6 +82,7 @@ export class MemStorage implements IStorage {
       name: insertMenuItem.name,
       description: insertMenuItem.description ?? null,
       price: insertMenuItem.price,
+      category: insertMenuItem.category,
       imageUrl: insertMenuItem.imageUrl ?? null,
       available: insertMenuItem.available ?? null,
       createdAt: new Date()

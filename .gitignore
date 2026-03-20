@@ -12,12 +12,30 @@ server/public
 .env
 .env.local
 .env.development.local
+
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+
+
+# Environment files (confidential)
+.env
+.env.*
+.env.local
+.env.development.local
 .env.test.local
 .env.production.local
+.env.local.example
 
-# IDE and Editor files
+# Editor / local machine files
 .idea/
 .vscode/
+.replit
+.local/
+.config/
+
+# Swap / OS
 *.swp
 *.swo
 .DS_Store
@@ -30,12 +48,21 @@ yarn-error.log*
 # TypeScript cache
 *.tsbuildinfo
 vite.config.ts.*
-
+supabase_schema.sql
 # Test coverage
 /coverage
 
-# Misc
+# Build artifacts, archives, backups
 *.log
 *.tar.gz
+qr-menu-saas.tar.gz
+README.md.bak
+*.bak
+dist/
+
+# Misc caches
 .cache
 .temp
+
+# Optional: ignore attached experimental assets (move to archive if needed)
+attached_assets/
