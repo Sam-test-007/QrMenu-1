@@ -1001,6 +1001,8 @@ export default function AdminDashboard() {
     }
   };
 
+  const anyPanelOpen = showMenuPanel || showTablesPanel || showSessionsPanel;
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1894,11 +1896,11 @@ export default function AdminDashboard() {
                 {/* Menu Panel Toggle + Panel (moved to left side) */}
                 {/* Toggle button */}
                 <div>
-                  {!showMenuPanel && (
-                    <button
-                      onClick={() => setShowMenuPanel(true)}
-                      aria-label="Open menu panel"
-                      title="Open Menu"
+                {!anyPanelOpen && (
+                  <button
+                    onClick={() => setShowMenuPanel(true)}
+                    aria-label="Open menu panel"
+                    title="Open Menu"
                       className="fixed left-4 top-1/3 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl"
                     >
                       <Utensils className="h-5 w-5 text-gray-700" />
@@ -1909,11 +1911,11 @@ export default function AdminDashboard() {
                   )}
 
                   {/* Tables Panel Toggle */}
-                  {!showTablesPanel && (
-                    <button
-                      onClick={() => setShowTablesPanel(true)}
-                      aria-label="Open tables panel"
-                      title="Open Tables"
+                {!anyPanelOpen && (
+                  <button
+                    onClick={() => setShowTablesPanel(true)}
+                    aria-label="Open tables panel"
+                    title="Open Tables"
                       className="fixed left-4 top-1/2 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl mt-16"
                     >
                       <QrCode className="h-5 w-5 text-gray-700" />
@@ -1924,11 +1926,11 @@ export default function AdminDashboard() {
                   )}
 
                   {/* Sessions Panel Toggle */}
-                  {!showSessionsPanel && (
-                    <button
-                      onClick={() => setShowSessionsPanel(true)}
-                      aria-label="Open sessions panel"
-                      title="Open Sessions"
+                {!anyPanelOpen && (
+                  <button
+                    onClick={() => setShowSessionsPanel(true)}
+                    aria-label="Open sessions panel"
+                    title="Open Sessions"
                       className="fixed left-4 top-1/2 z-50 bg-white shadow-lg rounded-md p-3 flex items-center space-x-2 hover:shadow-xl mt-32"
                     >
                       <Calendar className="h-5 w-5 text-gray-700" />
