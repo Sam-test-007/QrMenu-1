@@ -117,7 +117,7 @@ export default function CustomerMenu() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ expiresIn: "2m" }),
+          body: JSON.stringify({}),
         },
       );
 

@@ -163,10 +163,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const tableId = routePath.split("/")[2];
-      const body = (await req.json().catch(() => ({}))) as {
-        expiresIn?: string;
-      };
-      const expiresIn = body.expiresIn || "2m";
+      await req.json().catch(() => ({}));
 
       const { data: table, error } = await supabase
         .from("tables")
@@ -176,31 +173,27 @@ Deno.serve(async (req: Request) => {
         .maybeSingle();
 
       if (error || !table) {
-        const { count, error: countError } = await supabase
-          .from("tables")
-          .select("id", { count: "exact", head: true });
+        return jsonResponse({ error: "Table not found" }, 404);
+      }
 
-        return jsonResponse(
-          {
-            error: "Table not found",
-            db_error: error?.message ?? null,
-            db_code: (error as any)?.code ?? null,
-            tables_count: count ?? null,
-            tables_count_error: countError?.message ?? null,
-          },
-          404,
-        );
+      const { data: restaurantSettings } = await supabase
+        .from("restaurants")
+        .select("qr_token_ttl_minutes")
+        .eq("id", table.restaurant_id)
+        .limit(1)
+        .maybeSingle();
+
+      let expiresMinutes = Number(restaurantSettings?.qr_token_ttl_minutes ?? 60);
+      if (!Number.isFinite(expiresMinutes) || expiresMinutes < 1) {
+        expiresMinutes = 60;
+      }
+      if (expiresMinutes > 1440) {
+        expiresMinutes = 1440;
       }
 
       const issuedAt = Math.floor(Date.now() / 1000);
-      const expiresAt = issuedAt +
-        (expiresIn === "2h"
-          ? 7200
-          : expiresIn === "1h"
-          ? 3600
-          : expiresIn === "2m"
-          ? 120
-          : 120);
+      const expiresInSeconds = Math.floor(expiresMinutes * 60);
+      const expiresAt = issuedAt + expiresInSeconds;
 
       const key = await getJwtKey(jwtSecret);
       const token = await create(
@@ -230,13 +223,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({
         token,
         session_id: session,
-        expires_in: expiresIn === "2h"
-          ? 7200
-          : expiresIn === "1h"
-          ? 3600
-          : expiresIn === "2m"
-          ? 120
-          : 120,
+        expires_in: expiresInSeconds,
       });
     }
 
@@ -440,15 +427,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: true });
     }
 
-    return jsonResponse(
-      {
-        error: "Not found",
-        method: req.method,
-        fullPath,
-        routePath,
-      },
-      404,
-    );
+    return jsonResponse({ error: "Not found" }, 404);
   } catch (err) {
     console.error(err);
     return jsonResponse({ error: "Internal server error" }, 500);

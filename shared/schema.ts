@@ -16,6 +16,7 @@ export const restaurants = pgTable("restaurants", {
   name: text("name").notNull(),
   slug: text("slug").notNull().unique(),
   imageUrl: text("image_url"),
+  qrTokenTtlMinutes: integer("qr_token_ttl_minutes").default(60),
   createdAt: timestamp("created_at").default(sql`now()`),
 });
 

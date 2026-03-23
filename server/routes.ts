@@ -12,13 +12,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 app.post('/api/tables/:tableId/generate-token', async (req, res) => {
   try {
     const { tableId } = req.params;
-    const expiresIn = '1h'; // fixed to 1 hour
-
 
     // Verify table exists
     const { data: table, error } = await supabase
       .from('tables')
-      .select('*, restaurants(owner_id)')
+      .select('id, restaurant_id')
       .eq('id', tableId)
       .single();
 
@@ -26,8 +24,24 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
 
+    // Fetch per-restaurant QR TTL (minutes), default 60
+    const { data: restSettings } = await supabase
+      .from('restaurants')
+      .select('qr_token_ttl_minutes')
+      .eq('id', table.restaurant_id)
+      .single();
+
+    let expiresMinutes = Number(restSettings?.qr_token_ttl_minutes ?? 60);
+    if (!Number.isFinite(expiresMinutes) || expiresMinutes < 1) {
+      expiresMinutes = 60;
+    }
+    if (expiresMinutes > 1440) {
+      expiresMinutes = 1440;
+    }
+
     const issuedAt = Math.floor(Date.now() / 1000);
-    const expiresAt = issuedAt + 3600;
+    const expiresInSeconds = Math.floor(expiresMinutes * 60);
+    const expiresAt = issuedAt + expiresInSeconds;
     
 
     const token = jwt.sign(
@@ -55,7 +69,7 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
     res.json({
       token,
       session_id: session,
-      expires_in: 3600
+      expires_in: expiresInSeconds
       
     });
   } catch (err) {
