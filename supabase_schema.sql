@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.restaurants (
     name TEXT NOT NULL,
     slug TEXT NOT NULL UNIQUE,
     image_url TEXT,
+    qr_token_ttl_minutes INTEGER DEFAULT 60,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

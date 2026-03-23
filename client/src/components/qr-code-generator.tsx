@@ -20,6 +20,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { QrCode, Download, Copy, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { apiUrl } from "@/lib/api";
 import type { Restaurant, MenuItem } from "@shared/schema";
 
 interface Table {
@@ -84,12 +85,12 @@ export default function QRCodeGenerator({
     setLoading(true);
     try {
       const response = await fetch(
-        `/api/tables/${selectedTableId}/generate-token`,
+        apiUrl(`/api/tables/${selectedTableId}/generate-token`),
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ expiresIn: "2m" }),
-        }
+          body: JSON.stringify({}),
+        },
       );
 
       if (!response.ok) {

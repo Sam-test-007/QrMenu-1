@@ -99,6 +99,8 @@ export default function AdminDashboard() {
   const [showAddTableForm, setShowAddTableForm] = useState(false);
   const [newTable, setNewTable] = useState({ table_number: "", name: "" });
   const [editingTable, setEditingTable] = useState<any | null>(null);
+  const [qrTokenTtlDraft, setQrTokenTtlDraft] = useState<string>("60");
+  const [savingQrTokenTtl, setSavingQrTokenTtl] = useState(false);
 
   // Onboarding tour state
   const [showTour, setShowTour] = useState(false);
@@ -315,6 +317,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (selectedRestaurant) {
+      setQrTokenTtlDraft(
+        String(
+          (selectedRestaurant as any).qrTokenTtlMinutes ??
+            (selectedRestaurant as any).qr_token_ttl_minutes ??
+            60,
+        ),
+      );
       loadMenuItems();
       loadTables();
       loadOrders();
@@ -366,6 +375,8 @@ export default function AdminDashboard() {
       const normalized = (data || []).map((r: any) => ({
         ...r,
         imageUrl: r.image_url ?? r.imageUrl ?? null,
+        qrTokenTtlMinutes:
+          r.qr_token_ttl_minutes ?? r.qrTokenTtlMinutes ?? 60,
       }));
       setRestaurants(normalized);
       // If the admin has restaurants, auto-select the first one so they land
@@ -567,6 +578,54 @@ export default function AdminDashboard() {
         description: "Failed to load sessions",
         variant: "destructive",
       });
+    }
+  };
+
+  const saveQrTokenTtl = async () => {
+    if (!selectedRestaurant) return;
+    const parsed = Number(qrTokenTtlDraft);
+    if (!Number.isFinite(parsed) || parsed < 1 || parsed > 1440) {
+      toast({
+        title: "Invalid value",
+        description: "QR reset time must be between 1 and 1440 minutes.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setSavingQrTokenTtl(true);
+      const { data, error } = await supabase
+        .from("restaurants")
+        .update({ qr_token_ttl_minutes: parsed })
+        .eq("id", selectedRestaurant.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setSelectedRestaurant((prev) =>
+        prev ? { ...prev, qrTokenTtlMinutes: parsed } : prev,
+      );
+      setRestaurants((prev) =>
+        prev.map((r) =>
+          r.id === selectedRestaurant.id
+            ? { ...r, qrTokenTtlMinutes: parsed }
+            : r,
+        ),
+      );
+      toast({
+        title: "Saved",
+        description: "QR reset time updated.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to update QR reset time.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingQrTokenTtl(false);
     }
   };
 
@@ -1422,6 +1481,38 @@ export default function AdminDashboard() {
                               </strong>
                             </span>
                           </div>
+                        </div>
+
+                        <div className="mt-5 max-w-sm">
+                          <Label htmlFor="qr-ttl-minutes">
+                            QR Reset Time (minutes)
+                          </Label>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Input
+                              id="qr-ttl-minutes"
+                              type="number"
+                              min={1}
+                              max={1440}
+                              value={qrTokenTtlDraft}
+                              onChange={(e) =>
+                                setQrTokenTtlDraft(
+                                  (e.target as HTMLInputElement).value,
+                                )
+                              }
+                              className="w-32"
+                              data-testid="input-qr-ttl-minutes"
+                            />
+                            <Button
+                              onClick={saveQrTokenTtl}
+                              disabled={savingQrTokenTtl}
+                              data-testid="button-save-qr-ttl"
+                            >
+                              {savingQrTokenTtl ? "Saving..." : "Save"}
+                            </Button>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Default is 60 minutes. Range: 1–1440.
+                          </p>
                         </div>
                       </div>
                       {/* Help / Onboarding dialog */}

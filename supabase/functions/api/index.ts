@@ -1,4 +1,4 @@
-import { create, verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+﻿import { create, verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -57,6 +57,20 @@ Deno.serve(async (req: Request) => {
     routePath = routePath.slice(functionsMatch[0].length) || "/";
   } else if (routePath.startsWith("/api")) {
     routePath = routePath.slice(4) || "/";
+  } else {
+    // Some environments pass only "/<function-name>/..." without the /functions/v1 prefix.
+    const parts = routePath.split("/").filter(Boolean);
+    const routeStart = parts[1];
+    const knownStarts = new Set([
+      "tables",
+      "validate-token",
+      "orders",
+      "restaurants",
+      "sessions",
+    ]);
+    if (routeStart && knownStarts.has(routeStart)) {
+      routePath = `/${parts.slice(1).join("/")}`;
+    }
   }
 
   try {
@@ -101,7 +115,8 @@ Deno.serve(async (req: Request) => {
         .from("tables")
         .select("table_number, name")
         .eq("id", session.table_id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (tableError || !table) {
         return jsonResponse({ error: "Table not found" }, 404);
@@ -135,29 +150,50 @@ Deno.serve(async (req: Request) => {
       routePath.startsWith("/tables/") &&
       routePath.endsWith("/generate-token")
     ) {
+      if (!supabaseUrl || !supabaseServiceKey || !jwtSecret) {
+        return jsonResponse(
+          {
+            error: "Server misconfigured",
+            has_url: Boolean(supabaseUrl),
+            has_service_key: Boolean(supabaseServiceKey),
+            has_jwt_secret: Boolean(jwtSecret),
+          },
+          500,
+        );
+      }
+
       const tableId = routePath.split("/")[2];
-      const body = (await req.json().catch(() => ({}))) as {
-        expiresIn?: string;
-      };
-      const expiresIn = body.expiresIn || "2m";
+      await req.json().catch(() => ({}));
 
       const { data: table, error } = await supabase
         .from("tables")
-        .select("*, restaurants(owner_id)")
+        .select("id, restaurant_id")
         .eq("id", tableId)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      if (error || !table) return jsonResponse({ error: "Table not found" }, 404);
+      if (error || !table) {
+        return jsonResponse({ error: "Table not found" }, 404);
+      }
+
+      const { data: restaurantSettings } = await supabase
+        .from("restaurants")
+        .select("qr_token_ttl_minutes")
+        .eq("id", table.restaurant_id)
+        .limit(1)
+        .maybeSingle();
+
+      let expiresMinutes = Number(restaurantSettings?.qr_token_ttl_minutes ?? 60);
+      if (!Number.isFinite(expiresMinutes) || expiresMinutes < 1) {
+        expiresMinutes = 60;
+      }
+      if (expiresMinutes > 1440) {
+        expiresMinutes = 1440;
+      }
 
       const issuedAt = Math.floor(Date.now() / 1000);
-      const expiresAt = issuedAt +
-        (expiresIn === "2h"
-          ? 7200
-          : expiresIn === "1h"
-          ? 3600
-          : expiresIn === "2m"
-          ? 120
-          : 120);
+      const expiresInSeconds = Math.floor(expiresMinutes * 60);
+      const expiresAt = issuedAt + expiresInSeconds;
 
       const key = await getJwtKey(jwtSecret);
       const token = await create(
@@ -187,13 +223,7 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({
         token,
         session_id: session,
-        expires_in: expiresIn === "2h"
-          ? 7200
-          : expiresIn === "1h"
-          ? 3600
-          : expiresIn === "2m"
-          ? 120
-          : 120,
+        expires_in: expiresInSeconds,
       });
     }
 
