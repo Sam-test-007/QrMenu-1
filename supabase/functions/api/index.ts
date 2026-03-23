@@ -25,13 +25,16 @@ async function getJwtKey(secret: string) {
   );
 }
 
-const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const supabaseUrl = Deno.env.get("SB_URL") || Deno.env.get("SUPABASE_URL") || "";
+const supabaseServiceKey =
+  Deno.env.get("SB_SERVICE_ROLE_KEY") ||
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ||
+  "";
 const jwtSecret = Deno.env.get("JWT_SECRET") || "";
 
 if (!supabaseUrl || !supabaseServiceKey || !jwtSecret) {
   console.error(
-    "Missing SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, or JWT_SECRET",
+    "Missing SB_URL/SUPABASE_URL, SB_SERVICE_ROLE_KEY/SUPABASE_SERVICE_ROLE_KEY, or JWT_SECRET",
   );
 }
 
