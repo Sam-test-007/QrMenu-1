@@ -1,5 +1,5 @@
-import { create, verify } from "djwt";
-import { createClient } from "supabase";
+import { create, verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
