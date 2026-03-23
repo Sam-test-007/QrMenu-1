@@ -1,4 +1,4 @@
-import { create, verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
+﻿import { create, verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -57,6 +57,20 @@ Deno.serve(async (req: Request) => {
     routePath = routePath.slice(functionsMatch[0].length) || "/";
   } else if (routePath.startsWith("/api")) {
     routePath = routePath.slice(4) || "/";
+  } else {
+    // Some environments pass only "/<function-name>/..." without the /functions/v1 prefix.
+    const parts = routePath.split("/").filter(Boolean);
+    const routeStart = parts[1];
+    const knownStarts = new Set([
+      "tables",
+      "validate-token",
+      "orders",
+      "restaurants",
+      "sessions",
+    ]);
+    if (routeStart && knownStarts.has(routeStart)) {
+      routePath = `/${parts.slice(1).join("/")}`;
+    }
   }
 
   try {
@@ -101,7 +115,8 @@ Deno.serve(async (req: Request) => {
         .from("tables")
         .select("table_number, name")
         .eq("id", session.table_id)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
       if (tableError || !table) {
         return jsonResponse({ error: "Table not found" }, 404);
@@ -135,6 +150,18 @@ Deno.serve(async (req: Request) => {
       routePath.startsWith("/tables/") &&
       routePath.endsWith("/generate-token")
     ) {
+      if (!supabaseUrl || !supabaseServiceKey || !jwtSecret) {
+        return jsonResponse(
+          {
+            error: "Server misconfigured",
+            has_url: Boolean(supabaseUrl),
+            has_service_key: Boolean(supabaseServiceKey),
+            has_jwt_secret: Boolean(jwtSecret),
+          },
+          500,
+        );
+      }
+
       const tableId = routePath.split("/")[2];
       const body = (await req.json().catch(() => ({}))) as {
         expiresIn?: string;
@@ -143,11 +170,27 @@ Deno.serve(async (req: Request) => {
 
       const { data: table, error } = await supabase
         .from("tables")
-        .select("*, restaurants(owner_id)")
+        .select("id, restaurant_id")
         .eq("id", tableId)
-        .single();
+        .limit(1)
+        .maybeSingle();
 
-      if (error || !table) return jsonResponse({ error: "Table not found" }, 404);
+      if (error || !table) {
+        const { count, error: countError } = await supabase
+          .from("tables")
+          .select("id", { count: "exact", head: true });
+
+        return jsonResponse(
+          {
+            error: "Table not found",
+            db_error: error?.message ?? null,
+            db_code: (error as any)?.code ?? null,
+            tables_count: count ?? null,
+            tables_count_error: countError?.message ?? null,
+          },
+          404,
+        );
+      }
 
       const issuedAt = Math.floor(Date.now() / 1000);
       const expiresAt = issuedAt +
@@ -397,7 +440,15 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: true });
     }
 
-    return jsonResponse({ error: "Not found" }, 404);
+    return jsonResponse(
+      {
+        error: "Not found",
+        method: req.method,
+        fullPath,
+        routePath,
+      },
+      404,
+    );
   } catch (err) {
     console.error(err);
     return jsonResponse({ error: "Internal server error" }, 500);
