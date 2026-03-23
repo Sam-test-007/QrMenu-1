@@ -50,11 +50,11 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
   const fullPath = url.pathname;
   // Normalize path for Supabase edge functions and optional /api prefix.
-  // Deployed requests look like: /functions/v1/api/<route>
+  // Deployed requests look like: /functions/v1/<function-name>/<route>
   let routePath = fullPath;
-  const functionsPrefix = "/functions/v1/api";
-  if (routePath.startsWith(functionsPrefix)) {
-    routePath = routePath.slice(functionsPrefix.length) || "/";
+  const functionsMatch = routePath.match(/^\/functions\/v1\/[^/]+/);
+  if (functionsMatch) {
+    routePath = routePath.slice(functionsMatch[0].length) || "/";
   } else if (routePath.startsWith("/api")) {
     routePath = routePath.slice(4) || "/";
   }
