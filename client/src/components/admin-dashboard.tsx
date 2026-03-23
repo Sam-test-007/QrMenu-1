@@ -31,6 +31,7 @@ import QRCodeGenerator from "./qr-code-generator";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { Restaurant, MenuItem } from "@shared/schema";
 import { currency } from "@/lib/supabase";
+import { apiUrl } from "@/lib/api";
 
 interface Order {
   id: string;
@@ -518,7 +519,7 @@ export default function AdminDashboard() {
     if (!selectedRestaurant) return;
     try {
       const response = await fetch(
-        `/api/restaurants/${selectedRestaurant.id}/orders`,
+        apiUrl(`/api/restaurants/${selectedRestaurant.id}/orders`),
       );
       if (!response.ok) throw new Error("Failed to load orders");
 
@@ -554,7 +555,7 @@ export default function AdminDashboard() {
     if (!selectedRestaurant) return;
     try {
       const response = await fetch(
-        `/api/restaurants/${selectedRestaurant.id}/sessions`,
+        apiUrl(`/api/restaurants/${selectedRestaurant.id}/sessions`),
       );
       if (!response.ok) throw new Error("Failed to load sessions");
 
@@ -2560,7 +2561,9 @@ export default function AdminDashboard() {
                                       onConfirm: async () => {
                                         try {
                                           const response = await fetch(
-                                            `/api/sessions/${session.session_id}/close`,
+                                            apiUrl(
+                                              `/api/sessions/${session.session_id}/close`,
+                                            ),
                                             {
                                               method: "POST",
                                             },
