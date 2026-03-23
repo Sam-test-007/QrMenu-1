@@ -46,9 +46,15 @@ Deno.serve(async (req: Request) => {
 
   const url = new URL(req.url);
   const fullPath = url.pathname;
-  const routePath = fullPath.startsWith("/api")
-    ? fullPath.slice(4) || "/"
-    : fullPath;
+  // Normalize path for Supabase edge functions and optional /api prefix.
+  // Deployed requests look like: /functions/v1/api/<route>
+  let routePath = fullPath;
+  const functionsPrefix = "/functions/v1/api";
+  if (routePath.startsWith(functionsPrefix)) {
+    routePath = routePath.slice(functionsPrefix.length) || "/";
+  } else if (routePath.startsWith("/api")) {
+    routePath = routePath.slice(4) || "/";
+  }
 
   try {
     if (req.method === "POST" && routePath === "/validate-token") {

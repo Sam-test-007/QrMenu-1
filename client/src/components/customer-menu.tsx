@@ -50,6 +50,27 @@ export default function CustomerMenu() {
   const token = urlParams.get("token");
   const tableId = urlParams.get("table");
 
+  const readApiError = async (response: Response) => {
+    const text = await response.text();
+    try {
+      const data = JSON.parse(text);
+      return data.error || data.message || response.statusText;
+    } catch {
+      return text || response.statusText;
+    }
+  };
+
+  const readApiJson = async (response: Response) => {
+    const text = await response.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(
+        "Invalid server response (expected JSON). Check API base URL or server availability.",
+      );
+    }
+  };
+
   useEffect(() => {
     if (token) {
       // Token provided - validate it
@@ -101,11 +122,11 @@ export default function CustomerMenu() {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to generate token");
+        const errorMessage = await readApiError(response);
+        throw new Error(errorMessage || "Failed to generate token");
       }
 
-      const data = await response.json();
+      const data = await readApiJson(response);
 
       // Update URL with the new token
       const newUrl = new URL(window.location.href);
@@ -130,11 +151,11 @@ export default function CustomerMenu() {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Invalid token");
+      const errorMessage = await readApiError(response);
+      throw new Error(errorMessage || "Invalid token");
     }
 
-    const data = await response.json();
+    const data = await readApiJson(response);
     setSessionId(data.session_id);
     setTableInfo({
       table_number: data.table_number,
@@ -225,11 +246,11 @@ export default function CustomerMenu() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to place order");
+        const errorMessage = await readApiError(response);
+        throw new Error(errorMessage || "Failed to place order");
       }
 
-      const result = await response.json();
+      const result = await readApiJson(response);
 
       // Reset order after successful submission
       setMenu((prev) => ({
