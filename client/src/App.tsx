@@ -10,6 +10,7 @@ import ResetPassword from "@/pages/reset-password";
 import Dashboard from "@/pages/dashboard";
 import Menu from "@/pages/menu";
 import NotFound from "@/pages/not-found";
+import { Analytics } from "@vercel/analytics/react";
 
 function Router() {
   return (
@@ -37,6 +38,7 @@ function App() {
             <Route path="/menu/:slug" component={Menu} />
             <Route component={NotFound} />
           </Switch>
+          <Analytics />
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
