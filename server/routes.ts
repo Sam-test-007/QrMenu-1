@@ -124,7 +124,6 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
       if (restError || !restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
-      console.log('validate-token restaurant row:', restaurant);
 
       // Get table info
       const { data: table, error: tableError } = await supabase

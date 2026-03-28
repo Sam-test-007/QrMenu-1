@@ -103,7 +103,9 @@ Deno.serve(async (req: Request) => {
 
       const { data: restaurant, error: restError } = await supabase
         .from("restaurants")
-        .select("id, name, slug, image_url")
+        .select(
+          "id, name, slug, image_url, website_url, instagram_url, facebook_url, tiktok_url",
+        )
         .eq("id", session.restaurant_id)
         .single();
 
