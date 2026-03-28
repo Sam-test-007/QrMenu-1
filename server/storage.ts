@@ -64,6 +64,10 @@ export class MemStorage implements IStorage {
       name: insertRestaurant.name,
       slug: insertRestaurant.slug,
       imageUrl: insertRestaurant.imageUrl ?? null,
+      websiteUrl: insertRestaurant.websiteUrl ?? null,
+      instagramUrl: insertRestaurant.instagramUrl ?? null,
+      facebookUrl: insertRestaurant.facebookUrl ?? null,
+      tiktokUrl: insertRestaurant.tiktokUrl ?? null,
       createdAt: new Date()
     };
     this.restaurants.set(id, restaurant);

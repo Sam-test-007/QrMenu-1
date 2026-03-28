@@ -28,6 +28,18 @@ export default function ProfileCompletionDialog({
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
 
+  function normalizePhone(input: string) {
+    const trimmed = input.trim();
+    const hasPlusAtStart = trimmed.startsWith("+");
+    const digitsOnly = trimmed.replace(/[^\d]/g, "");
+    return {
+      normalized: `${hasPlusAtStart ? "+" : ""}${digitsOnly}`,
+      digitsCount: digitsOnly.length,
+      hasPlusAtStart,
+      raw: trimmed,
+    };
+  }
+
   async function handleSaveProfile() {
     if (!fullName.trim()) {
       toast({
@@ -47,12 +59,30 @@ export default function ProfileCompletionDialog({
       return;
     }
 
-    // Validate phone number (basic validation)
-    const phoneRegex = /^[\d\s\-\+\(\)]{10,}$/;
-    if (!phoneRegex.test(phoneNumber)) {
+    const phoneCheck = normalizePhone(phoneNumber);
+    const allowedChars = /^[\d\s\-\+\(\)]+$/;
+    if (!allowedChars.test(phoneCheck.raw)) {
       toast({
         title: "Error",
-        description: "Please enter a valid phone number",
+        description:
+          "Phone number can only contain digits, spaces, +, -, and parentheses",
+        variant: "destructive",
+      });
+      return;
+    }
+    const plusCount = (phoneCheck.raw.match(/\+/g) || []).length;
+    if (plusCount > 1 || (plusCount === 1 && !phoneCheck.hasPlusAtStart)) {
+      toast({
+        title: "Error",
+        description: "Use a single + at the start of the phone number only",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (phoneCheck.digitsCount < 10 || phoneCheck.digitsCount > 15) {
+      toast({
+        title: "Error",
+        description: "Phone number must have 10 to 15 digits",
         variant: "destructive",
       });
       return;
@@ -70,7 +100,7 @@ export default function ProfileCompletionDialog({
 
       const profilePayload = {
         full_name: fullName.trim(),
-        phone_number: phoneNumber.trim(),
+        phone_number: phoneCheck.normalized,
       };
 
       const { error } = existingProfile

@@ -153,12 +153,57 @@ export default function AdminDashboard() {
   const [profileOther, setProfileOther] = useState<string>(
     user?.user_metadata?.other ?? "",
   );
+  const [restaurantWebsite, setRestaurantWebsite] = useState("");
+  const [restaurantInstagram, setRestaurantInstagram] = useState("");
+  const [restaurantFacebook, setRestaurantFacebook] = useState("");
+  const [restaurantTiktok, setRestaurantTiktok] = useState("");
+
+  const normalizePhone = (input: string) => {
+    const trimmed = input.trim();
+    const hasPlusAtStart = trimmed.startsWith("+");
+    const digitsOnly = trimmed.replace(/[^\d]/g, "");
+    return {
+      normalized: `${hasPlusAtStart ? "+" : ""}${digitsOnly}`,
+      digitsCount: digitsOnly.length,
+      hasPlusAtStart,
+      raw: trimmed,
+    };
+  };
+
+  const toHref = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  };
 
   useEffect(() => {
     setProfileName(user?.user_metadata?.full_name ?? "");
     setProfilePhone(user?.user_metadata?.phone ?? "");
     setProfileOther(user?.user_metadata?.other ?? "");
   }, [user]);
+
+  useEffect(() => {
+    setRestaurantWebsite(
+      selectedRestaurant?.websiteUrl ??
+        (selectedRestaurant as any)?.website_url ??
+        "",
+    );
+    setRestaurantInstagram(
+      selectedRestaurant?.instagramUrl ??
+        (selectedRestaurant as any)?.instagram_url ??
+        "",
+    );
+    setRestaurantFacebook(
+      selectedRestaurant?.facebookUrl ??
+        (selectedRestaurant as any)?.facebook_url ??
+        "",
+    );
+    setRestaurantTiktok(
+      selectedRestaurant?.tiktokUrl ??
+        (selectedRestaurant as any)?.tiktok_url ??
+        "",
+    );
+  }, [selectedRestaurant]);
 
   // keep a small timer so the "today" count resets soon after midnight
   useEffect(() => {
@@ -375,6 +420,10 @@ export default function AdminDashboard() {
       const normalized = (data || []).map((r: any) => ({
         ...r,
         imageUrl: r.image_url ?? r.imageUrl ?? null,
+        websiteUrl: r.website_url ?? r.websiteUrl ?? null,
+        instagramUrl: r.instagram_url ?? r.instagramUrl ?? null,
+        facebookUrl: r.facebook_url ?? r.facebookUrl ?? null,
+        tiktokUrl: r.tiktok_url ?? r.tiktokUrl ?? null,
         qrTokenTtlMinutes:
           r.qr_token_ttl_minutes ?? r.qrTokenTtlMinutes ?? 60,
       }));
@@ -1005,6 +1054,40 @@ export default function AdminDashboard() {
 
   const updateUserProfile = async () => {
     try {
+      if (profilePhone.trim()) {
+        const phoneCheck = normalizePhone(profilePhone);
+        const allowedChars = /^[\d\s\-\+\(\)]+$/;
+        if (!allowedChars.test(phoneCheck.raw)) {
+          toast({
+            title: "Error",
+            description:
+              "Phone number can only contain digits, spaces, +, -, and parentheses",
+            variant: "destructive",
+          });
+          return;
+        }
+        const plusCount = (phoneCheck.raw.match(/\+/g) || []).length;
+        if (plusCount > 1 || (plusCount === 1 && !phoneCheck.hasPlusAtStart)) {
+          toast({
+            title: "Error",
+            description: "Use a single + at the start of the phone number only",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (phoneCheck.digitsCount < 10 || phoneCheck.digitsCount > 15) {
+          toast({
+            title: "Error",
+            description: "Phone number must have 10 to 15 digits",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (profilePhone !== phoneCheck.normalized) {
+          setProfilePhone(phoneCheck.normalized);
+        }
+      }
+
       // update user metadata
       // using supabase auth updateUser (v2)
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -1012,11 +1095,56 @@ export default function AdminDashboard() {
       const { data, error } = await supabase.auth.updateUser({
         data: {
           full_name: profileName,
-          phone: profilePhone,
+          phone: profilePhone.trim()
+            ? normalizePhone(profilePhone).normalized
+            : "",
           other: profileOther,
         },
       });
       if (error) throw error;
+
+      if (selectedRestaurant) {
+        const restaurantPayload = {
+          website_url: restaurantWebsite.trim() || null,
+          instagram_url: restaurantInstagram.trim() || null,
+          facebook_url: restaurantFacebook.trim() || null,
+          tiktok_url: restaurantTiktok.trim() || null,
+        };
+        const { data: updatedRestaurant, error: restaurantError } =
+          await supabase
+            .from("restaurants")
+            .update(restaurantPayload)
+            .eq("id", selectedRestaurant.id)
+            .select()
+            .single();
+        if (restaurantError) throw restaurantError;
+
+        setSelectedRestaurant((prev) =>
+          prev
+            ? {
+                ...prev,
+                websiteUrl: updatedRestaurant.website_url ?? null,
+                instagramUrl: updatedRestaurant.instagram_url ?? null,
+                facebookUrl: updatedRestaurant.facebook_url ?? null,
+                tiktokUrl: updatedRestaurant.tiktok_url ?? null,
+              }
+            : prev,
+        );
+        setRestaurants((prev) =>
+          prev.map((r) =>
+            r.id === selectedRestaurant.id
+              ? {
+                  ...r,
+                  websiteUrl: updatedRestaurant.website_url ?? null,
+                  instagramUrl: updatedRestaurant.instagram_url ?? null,
+                  facebookUrl: updatedRestaurant.facebook_url ?? null,
+                  tiktokUrl: updatedRestaurant.tiktok_url ?? null,
+                }
+              : r,
+          ),
+        );
+      }
+
       toast({ title: "Success", description: "Profile updated." });
       setProfileDialogOpen(false);
     } catch (error: any) {
@@ -1188,6 +1316,108 @@ export default function AdminDashboard() {
                   placeholder="Owner, manager, or anything you'd like us to know"
                 />
               </div>
+              <div className="pt-2 border-t border-gray-100">
+                <div className="text-sm font-medium text-gray-900 mb-2">
+                  Restaurant social links
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="restaurant-website">Website</Label>
+                    {restaurantWebsite.trim() && (
+                      <a
+                        href={toHref(restaurantWebsite)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                      >
+                        Open
+                      </a>
+                    )}
+                  </div>
+                  <Input
+                    id="restaurant-website"
+                    value={restaurantWebsite}
+                    onChange={(e) => setRestaurantWebsite(e.target.value)}
+                    placeholder="https://your-restaurant.com"
+                    type="url"
+                    disabled={!selectedRestaurant}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="restaurant-instagram">Instagram</Label>
+                    {restaurantInstagram.trim() && (
+                      <a
+                        href={toHref(restaurantInstagram)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                      >
+                        Open
+                      </a>
+                    )}
+                  </div>
+                  <Input
+                    id="restaurant-instagram"
+                    value={restaurantInstagram}
+                    onChange={(e) => setRestaurantInstagram(e.target.value)}
+                    placeholder="https://instagram.com/yourhandle"
+                    type="url"
+                    disabled={!selectedRestaurant}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="restaurant-facebook">Facebook</Label>
+                    {restaurantFacebook.trim() && (
+                      <a
+                        href={toHref(restaurantFacebook)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                      >
+                        Open
+                      </a>
+                    )}
+                  </div>
+                  <Input
+                    id="restaurant-facebook"
+                    value={restaurantFacebook}
+                    onChange={(e) => setRestaurantFacebook(e.target.value)}
+                    placeholder="https://facebook.com/yourpage"
+                    type="url"
+                    disabled={!selectedRestaurant}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="restaurant-tiktok">TikTok</Label>
+                    {restaurantTiktok.trim() && (
+                      <a
+                        href={toHref(restaurantTiktok)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                      >
+                        Open
+                      </a>
+                    )}
+                  </div>
+                  <Input
+                    id="restaurant-tiktok"
+                    value={restaurantTiktok}
+                    onChange={(e) => setRestaurantTiktok(e.target.value)}
+                    placeholder="https://tiktok.com/@yourhandle"
+                    type="url"
+                    disabled={!selectedRestaurant}
+                  />
+                </div>
+                {!selectedRestaurant && (
+                  <p className="text-xs text-gray-500">
+                    Select a restaurant to edit its social links.
+                  </p>
+                )}
+              </div>
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <Button
@@ -1196,6 +1426,26 @@ export default function AdminDashboard() {
                   setProfileName(user?.user_metadata?.full_name ?? "");
                   setProfilePhone(user?.user_metadata?.phone ?? "");
                   setProfileOther(user?.user_metadata?.other ?? "");
+                  setRestaurantWebsite(
+                    selectedRestaurant?.websiteUrl ??
+                      (selectedRestaurant as any)?.website_url ??
+                      "",
+                  );
+                  setRestaurantInstagram(
+                    selectedRestaurant?.instagramUrl ??
+                      (selectedRestaurant as any)?.instagram_url ??
+                      "",
+                  );
+                  setRestaurantFacebook(
+                    selectedRestaurant?.facebookUrl ??
+                      (selectedRestaurant as any)?.facebook_url ??
+                      "",
+                  );
+                  setRestaurantTiktok(
+                    selectedRestaurant?.tiktokUrl ??
+                      (selectedRestaurant as any)?.tiktok_url ??
+                      "",
+                  );
                 }}
               >
                 Reset

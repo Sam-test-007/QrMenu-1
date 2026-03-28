@@ -35,6 +35,12 @@ export default function CustomerMenu() {
   const [restaurantImageUrl, setRestaurantImageUrl] = useState<string | null>(
     null,
   );
+  const [restaurantLinks, setRestaurantLinks] = useState<{
+    website?: string | null;
+    instagram?: string | null;
+    facebook?: string | null;
+    tiktok?: string | null;
+  }>({});
   const [suggestion, setSuggestion] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -172,6 +178,12 @@ export default function CustomerMenu() {
       })),
     });
     setRestaurantImageUrl(data.restaurant.image_url);
+    setRestaurantLinks({
+      website: data.restaurant.website_url ?? null,
+      instagram: data.restaurant.instagram_url ?? null,
+      facebook: data.restaurant.facebook_url ?? null,
+      tiktok: data.restaurant.tiktok_url ?? null,
+    });
   };
 
   const validateTokenAndLoadMenu = async () => {
@@ -295,6 +307,26 @@ export default function CustomerMenu() {
     new Set(menu.items.map((i) => (i as any).category || "Uncategorized")),
   );
 
+  const toHref = (
+    value?: string | null,
+    platform?: "website" | "instagram" | "facebook" | "tiktok",
+  ) => {
+    if (!value) return "";
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (/^instagram\.com/i.test(trimmed)) return `https://${trimmed}`;
+    if (/^facebook\.com/i.test(trimmed)) return `https://${trimmed}`;
+    if (/^tiktok\.com/i.test(trimmed)) return `https://${trimmed}`;
+
+    const handle = trimmed.replace(/^@/, "");
+    if (platform === "instagram") return `https://instagram.com/${handle}`;
+    if (platform === "facebook") return `https://facebook.com/${handle}`;
+    if (platform === "tiktok") return `https://tiktok.com/@${handle}`;
+
+    return `https://${trimmed}`;
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-2xl mx-auto px-4 py-8">
@@ -333,11 +365,53 @@ export default function CustomerMenu() {
           <p className="text-gray-600">
             Place Your Order. Wait for it to be served!
           </p>
-          <p className="text-gray-600">
-            <a href="https://facebook.com">Facebook </a>
-            <a href="https://instagram.com">Instagram </a>
-            <a href="https://twitter.com">Twitter</a>
-          </p>
+          {(restaurantLinks.website ||
+            restaurantLinks.instagram ||
+            restaurantLinks.facebook ||
+            restaurantLinks.tiktok) && (
+            <div className="mt-3 flex flex-wrap justify-center gap-3 text-sm">
+              {restaurantLinks.website && (
+                <a
+                  href={toHref(restaurantLinks.website, "website")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                >
+                  Website
+                </a>
+              )}
+              {restaurantLinks.instagram && (
+                <a
+                  href={toHref(restaurantLinks.instagram, "instagram")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                >
+                  Instagram
+                </a>
+              )}
+              {restaurantLinks.facebook && (
+                <a
+                  href={toHref(restaurantLinks.facebook, "facebook")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                >
+                  Facebook
+                </a>
+              )}
+              {restaurantLinks.tiktok && (
+                <a
+                  href={toHref(restaurantLinks.tiktok, "tiktok")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-primary-600 hover:text-primary-700 underline underline-offset-4"
+                >
+                  TikTok
+                </a>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Menu Categories */}
