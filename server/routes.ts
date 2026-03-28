@@ -108,13 +108,23 @@ app.post('/api/tables/:tableId/generate-token', async (req, res) => {
       // Get restaurant and menu
       const { data: restaurant, error: restError } = await supabase
         .from('restaurants')
-        .select('id, name, slug, image_url')
+        .select(`
+          id,
+          name,
+          slug,
+          image_url,
+          website_url,
+          instagram_url,
+          facebook_url,
+          tiktok_url
+        `)
         .eq('id', session.restaurant_id)
         .single();
 
       if (restError || !restaurant) {
         return res.status(404).json({ error: 'Restaurant not found' });
       }
+      console.log('validate-token restaurant row:', restaurant);
 
       // Get table info
       const { data: table, error: tableError } = await supabase

@@ -18,7 +18,8 @@ export default function Landing() {
               </div>
             </div>
             <p className="text-gray-600">
-              Create contactless, editable menus for your restaurant. Sign in to manage your menu and generate QR links.
+              Create contactless, editable menus for your restaurant. Sign in to
+              manage your menu and generate QR links.
             </p>
           </CardHeader>
           <CardContent>
@@ -27,7 +28,7 @@ export default function Landing() {
             </Button>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>How it works</CardTitle>
@@ -35,9 +36,12 @@ export default function Landing() {
           <CardContent>
             <ol className="list-decimal list-inside text-sm text-gray-600 space-y-2">
               <li>Sign up / sign in as owner</li>
-              <li>Create a restaurant (slug)</li>
+              <li>Create a restaurant </li>
               <li>Add items and generate QR link</li>
-              <li>Guests scan the QR and place quantities — they see the total bill</li>
+              <li>
+                Guests scan the QR and place quantities — they see the total
+                bill
+              </li>
             </ol>
           </CardContent>
         </Card>
